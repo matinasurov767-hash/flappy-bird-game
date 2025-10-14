@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Flappy Bird by Matin</title>
     
-    <!-- ДОБАВЛЕНЫ СТРОКИ ДЛЯ PWA -->
+    <!-- PWA манифест -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1E90FF">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -23,23 +23,87 @@
             align-items: center;
             height: 100vh;
             overflow: hidden;
+            font-family: 'Arial', sans-serif;
         }
         #game-container {
             max-width: 100%;
             max-height: 100%;
+            position: relative;
+        }
+        #ad-container {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 107, 107, 0.9);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 15px;
+            font-size: 12px;
+            z-index: 1000;
+            display: none;
         }
     </style>
 </head>
 <body>
     <div id="game-container"></div>
+    <div id="ad-container">Реклама · Поддержите разработчика</div>
+    
     <script>
-        // Интеграция с Telegram Web App
+        // =============================================
+        // ИНТЕГРАЦИЯ С TELEGRAM
+        // =============================================
         let tg = window.Telegram?.WebApp;
         if (tg) {
             tg.ready();
             tg.expand();
         }
 
+        // =============================================
+        // МЕНЕДЖЕР РЕКЛАМЫ
+        // =============================================
+        class AdManager {
+            constructor() {
+                this.adInterval = 3;
+                this.gamesPlayed = 0;
+                this.adContainer = document.getElementById('ad-container');
+            }
+
+            showInterstitial() {
+                this.gamesPlayed++;
+                if (this.gamesPlayed >= this.adInterval) {
+                    this.gamesPlayed = 0;
+                    this.showAd();
+                }
+            }
+
+            showAd() {
+                this.adContainer.style.display = 'block';
+                this.adContainer.textContent = 'Реклама · Поддержите разработчика Matin';
+                
+                setTimeout(() => {
+                    this.adContainer.style.display = 'none';
+                }, 5000);
+            }
+
+            showRewardedAd() {
+                return new Promise((resolve) => {
+                    this.adContainer.style.display = 'block';
+                    this.adContainer.innerHTML = 'Реклама · Получите +10 очков<br><small>Закройте через 3 сек</small>';
+                    
+                    setTimeout(() => {
+                        this.adContainer.style.display = 'none';
+                        resolve(true);
+                    }, 3000);
+                });
+            }
+        }
+
+        const adManager = new AdManager();
+
+        // =============================================
+        // КОНФИГУРАЦИЯ ИГРЫ
+        // =============================================
         const config = {
             type: Phaser.AUTO,
             parent: 'game-container',
@@ -52,11 +116,6 @@
                     debug: false
                 } 
             },
-            scene: {
-                preload: preload,
-                create: create,
-                update: update
-            },
             scale: {
                 mode: Phaser.Scale.FIT,
                 autoCenter: Phaser.Scale.CENTER_BOTH
@@ -64,141 +123,310 @@
         };
 
         const game = new Phaser.Game(config);
-        let bird, pipes, score = 0, scoreText, gameOver = false;
-        let spaceKey, flapVelocity = -350;
-        let pipeInterval = 1500;
 
-        function preload() {
-            this.load.image('bird', 'assets/bird.png');
-            this.load.image('pipe', 'assets/pipe.png');
-            this.load.image('background', 'assets/background.png');
+        // =============================================
+        // СЦЕНА ЗАСТАВКИ
+        // =============================================
+        class SplashScene extends Phaser.Scene {
+            constructor() {
+                super({ key: 'SplashScene' });
+            this.assetsLoaded = false;
         }
 
-        function create() {
-            // Фон
-            this.add.image(config.width/2, config.height/2, 'background')
-                .setDisplaySize(config.width, config.height);
+            preload() {
+                // Загружаем ассеты
+                this.load.image('bird', 'assets/bird.png');
+                this.load.image('pipe', 'assets/pipe.png');
+                this.load.image('background', 'assets/background.png');
 
-            // Птица
-            bird = this.physics.add.sprite(80, config.height/2, 'bird');
-            bird.setCollideWorldBounds(true);
-            
-            // Группа труб
-            pipes = this.physics.add.group();
-            
-            // Коллайдер
-            this.physics.add.collider(bird, pipes, hitPipe, null, this);
-            
-            // Счет
-            scoreText = this.add.text(20, 20, 'Счёт: 0', { 
-                fontSize: '24px', 
-                fill: '#FFF',
-                fontFamily: 'Arial',
-                stroke: '#000',
-                strokeThickness: 4
-            });
-            
-            // Управление
-            this.input.on('pointerdown', flap);
-            spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-            spaceKey.on('down', flap);
-            
-            // Генерация труб
-            this.time.addEvent({ 
-                delay: pipeInterval, 
-                callback: addPipe, 
-                callbackScope: this, 
-                loop: true 
-            });
-        }
+                // Индикатор загрузки
+                const progressBox = this.add.graphics();
+                progressBox.fillStyle(0x222222, 0.8);
+                progressBox.fillRect(110, 270, 140, 30);
 
-        function update() {
-            if (gameOver) return;
-            
-            // Поворот птицы в зависимости от скорости
-            if (bird.body.velocity.y < 0) {
-                bird.rotation = -0.3;
-            } else {
-                bird.rotation = Phaser.Math.Clamp(bird.body.velocity.y / 400, -0.3, 0.5);
+                const progressBar = this.add.graphics();
+                
+                this.load.on('progress', (value) => {
+                    progressBar.clear();
+                    progressBar.fillStyle(0x1E90FF, 1);
+                    progressBar.fillRect(115, 275, 130 * value, 20);
+                });
+
+                this.load.on('complete', () => {
+                    progressBar.destroy();
+                    progressBox.destroy();
+                    this.assetsLoaded = true;
+                });
             }
-            
-            // Конец игры если упала или улетела вверх
-            if (bird.y > config.height - 10 || bird.y < -10) {
-                endGame();
-            }
-            
-            // Обновление счета
-            pipes.children.iterate(pipe => {
-                if (!pipe.passed && pipe.x < bird.x - 10 && pipe.texture.key === 'pipe') {
-                    pipe.passed = true;
-                    score += 0.5;
-                    scoreText.setText('Счёт: ' + Math.floor(score));
+
+            create() {
+                // Фон
+                this.cameras.main.setBackgroundColor(0x1a1a2e);
+
+                // Заголовок
+                const title = this.add.text(config.width/2, 200, 'FLAPPY BIRD', {
+                    fontSize: '32px',
+                    fill: '#FFD700',
+                    fontStyle: 'bold'
+                }).setOrigin(0.5);
+
+                const developer = this.add.text(config.width/2, 240, 'by MATIN', {
+                    fontSize: '18px',
+                    fill: '#FFFFFF'
+                }).setOrigin(0.5);
+
+                // Лучший счет
+                const bestScore = localStorage.getItem('flappyBestScore') || 0;
+                const bestScoreText = this.add.text(config.width/2, 280, `Рекорд: ${bestScore}`, {
+                    fontSize: '16px',
+                    fill: '#CCCCCC'
+                }).setOrigin(0.5);
+
+                // Кнопка начала игры
+                const startButton = this.add.text(config.width/2, 350, 'НАЧАТЬ ИГРУ', {
+                    fontSize: '20px',
+                    fill: '#FFFFFF',
+                    backgroundColor: '#1E90FF',
+                    padding: { x: 20, y: 10 }
+                }).setOrigin(0.5).setInteractive();
+
+                startButton.on('pointerover', () => {
+                    startButton.setBackgroundColor('#1565C0');
+                });
+
+                startButton.on('pointerout', () => {
+                    startButton.setBackgroundColor('#1E90FF');
+                });
+
+                startButton.on('pointerdown', () => {
+                    if (this.assetsLoaded) {
+                        this.scene.start('MainGame');
+                    }
+                });
+
+                // Автопереход через 3 секунды после загрузки
+                if (this.assetsLoaded) {
+                    this.time.delayedCall(3000, () => {
+                        this.scene.start('MainGame');
+                    });
                 }
-            });
-        }
-
-        function flap() {
-            if (gameOver) {
-                // Рестарт игры
-                score = 0;
-                gameOver = false;
-                bird.setTint(0xFFFFFF);
-                bird.setVelocityY(0);
-                bird.y = config.height/2;
-                bird.rotation = 0;
-                pipes.clear(true, true);
-                scoreText.setText('Счёт: 0');
-                return;
-            }
-            
-            bird.setVelocityY(flapVelocity);
-        }
-
-        function addPipe() {
-            if (gameOver) return;
-            
-            const gap = 180;
-            const holePosition = Phaser.Math.Between(120, config.height - 120);
-            
-            // Верхняя труба
-            const topPipe = pipes.create(config.width, holePosition - gap/2, 'pipe');
-            topPipe.setOrigin(0.5, 1);
-            topPipe.setImmovable(true);
-            topPipe.body.allowGravity = false;
-            topPipe.setVelocityX(-200);
-            
-            // Нижняя труба  
-            const bottomPipe = pipes.create(config.width, holePosition + gap/2, 'pipe');
-            bottomPipe.setOrigin(0.5, 0);
-            bottomPipe.setImmovable(true);
-            bottomPipe.body.allowGravity = false;
-            bottomPipe.setVelocityX(-200);
-        }
-
-        function hitPipe() {
-            if (!gameOver) {
-                endGame();
             }
         }
 
-        function endGame() {
-            gameOver = true;
-            bird.setTint(0xFF0000);
-            bird.setVelocityY(-200);
-            
-            // Финал счета
-            scoreText.setText('Игра окончена!\nСчёт: ' + Math.floor(score) + '\nТапни для рестарта');
-            scoreText.setPosition(config.width/2, config.height/2);
-            scoreText.setOrigin(0.5);
-            
-            // Отправка счета в Telegram
-            if (tg) {
-                tg.sendData(JSON.stringify({ 
-                    action: 'game_over',
-                    score: Math.floor(score)
-                }));
+        // =============================================
+        // ОСНОВНАЯ ИГРА
+        // =============================================
+        class MainGame extends Phaser.Scene {
+            constructor() {
+                super({ key: 'MainGame' });
+            this.score = 0;
+            this.gameOver = false;
+        }
+
+            create() {
+                // Фон
+                this.add.image(config.width/2, config.height/2, 'background')
+                    .setDisplaySize(config.width, config.height);
+
+                // Птица
+                this.bird = this.physics.add.sprite(80, config.height/2, 'bird');
+                this.bird.setCollideWorldBounds(true);
+                
+                // Трубы
+                this.pipes = this.physics.add.group();
+                
+                // Коллайдер
+                this.physics.add.collider(this.bird, this.pipes, this.hitPipe, null, this);
+                
+                // Счет
+                this.scoreText = this.add.text(20, 20, 'Счёт: 0', { 
+                    fontSize: '20px', 
+                    fill: '#FFF',
+                    stroke: '#000',
+                    strokeThickness: 4
+                });
+
+                // Лучший счет
+                this.bestScore = localStorage.getItem('flappyBestScore') || 0;
+                this.bestScoreText = this.add.text(20, 50, 'Рекорд: ' + this.bestScore, { 
+                    fontSize: '14px', 
+                    fill: '#FFD700'
+                });
+                
+                // Управление
+                this.input.on('pointerdown', this.flap, this);
+                
+                // Генерация труб
+                this.pipeTimer = this.time.addEvent({ 
+                    delay: 1500, 
+                    callback: this.addPipe, 
+                    callbackScope: this, 
+                    loop: true 
+                });
+            }
+
+            update() {
+                if (this.gameOver) return;
+                
+                // Поворот птицы
+                if (this.bird.body.velocity.y < 0) {
+                    this.bird.rotation = -0.3;
+                } else {
+                    this.bird.rotation = Phaser.Math.Clamp(this.bird.body.velocity.y / 400, -0.3, 0.5);
+                }
+                
+                // Конец игры
+                if (this.bird.y > config.height - 10 || this.bird.y < -10) {
+                    this.endGame();
+                }
+                
+                // Обновление счета
+                this.pipes.children.iterate(pipe => {
+                    if (!pipe.passed && pipe.x < this.bird.x - 10) {
+                        pipe.passed = true;
+                        this.score += 0.5;
+                        this.scoreText.setText('Счёт: ' + Math.floor(this.score));
+                    }
+                });
+            }
+
+            flap() {
+                if (this.gameOver) return;
+                this.bird.setVelocityY(-350);
+            }
+
+            addPipe() {
+                if (this.gameOver) return;
+                
+                const gap = 180;
+                const holePosition = Phaser.Math.Between(120, config.height - 120);
+                
+                // Верхняя труба
+                const topPipe = this.pipes.create(config.width, holePosition - gap/2, 'pipe');
+                topPipe.setOrigin(0.5, 1);
+                topPipe.setImmovable(true);
+                topPipe.body.allowGravity = false;
+                topPipe.setVelocityX(-200);
+                
+                // Нижняя труба  
+                const bottomPipe = this.pipes.create(config.width, holePosition + gap/2, 'pipe');
+                bottomPipe.setOrigin(0.5, 0);
+                bottomPipe.setImmovable(true);
+                bottomPipe.body.allowGravity = false;
+                bottomPipe.setVelocityX(-200);
+            }
+
+            hitPipe() {
+                if (!this.gameOver) {
+                    this.endGame();
+                }
+            }
+
+            endGame() {
+                this.gameOver = true;
+                this.bird.setTint(0xFF0000);
+                
+                // Сохраняем рекорд
+                const finalScore = Math.floor(this.score);
+                if (finalScore > this.bestScore) {
+                    localStorage.setItem('flappyBestScore', finalScore);
+                }
+                
+                // Переход на сцену окончания
+                this.scene.start('GameOverScene', { 
+                    score: finalScore,
+                    bestScore: Math.max(finalScore, this.bestScore)
+                });
             }
         }
+
+        // =============================================
+        // СЦЕНА КОНЦА ИГРЫ
+        // =============================================
+        class GameOverScene extends Phaser.Scene {
+            constructor() {
+                super({ key: 'GameOverScene' });
+            }
+
+            init(data) {
+                this.score = data.score;
+                this.bestScore = data.bestScore;
+            }
+
+            create() {
+                // Полупрозрачный фон
+                const overlay = this.add.rectangle(0, 0, config.width, config.height, 0x000000, 0.7);
+                overlay.setOrigin(0);
+
+                // Панель результатов
+                const panel = this.add.graphics();
+                panel.fillStyle(0x1a1a2e, 1);
+                panel.fillRoundedRect(config.width/2 - 120, config.height/2 - 100, 240, 200, 10);
+
+                // Текст
+                this.add.text(config.width/2, config.height/2 - 70, 'ИГРА ОКОНЧЕНА', {
+                    fontSize: '20px',
+                    fill: '#FF6B6B',
+                    fontStyle: 'bold'
+                }).setOrigin(0.5);
+
+                this.add.text(config.width/2, config.height/2 - 30, 'Счёт: ' + this.score, {
+                    fontSize: '24px',
+                    fill: '#FFD700'
+                }).setOrigin(0.5);
+
+                this.add.text(config.width/2, config.height/2, 'Рекорд: ' + this.bestScore, {
+                    fontSize: '18px',
+                    fill: '#1E90FF'
+                }).setOrigin(0.5);
+
+                // Кнопка рестарта
+                const restartButton = this.add.text(config.width/2, config.height/2 + 40, 'ИГРАТЬ СНОВА', {
+                    fontSize: '16px',
+                    fill: '#FFFFFF',
+                    backgroundColor: '#1E90FF',
+                    padding: { x: 15, y: 8 }
+                }).setOrigin(0.5).setInteractive();
+
+                // Кнопка в меню
+                const menuButton = this.add.text(config.width/2, config.height/2 + 70, 'В МЕНЮ', {
+                    fontSize: '14px',
+                    fill: '#CCCCCC',
+                    backgroundColor: '#333333',
+                    padding: { x: 15, y: 6 }
+                }).setOrigin(0.5).setInteractive();
+
+                // Обработчики кнопок
+                restartButton.on('pointerover', () => restartButton.setBackgroundColor('#1565C0'));
+                restartButton.on('pointerout', () => restartButton.setBackgroundColor('#1E90FF'));
+                restartButton.on('pointerdown', () => {
+                    adManager.showInterstitial();
+                    this.scene.start('MainGame');
+                });
+
+                menuButton.on('pointerover', () => menuButton.setBackgroundColor('#555555'));
+                menuButton.on('pointerout', () => menuButton.setBackgroundColor('#333333'));
+                menuButton.on('pointerdown', () => {
+                    this.scene.start('SplashScene');
+                });
+
+                // Отправка в Telegram
+                if (tg) {
+                    tg.sendData(JSON.stringify({ 
+                        action: 'game_over',
+                        score: this.score
+                    }));
+                }
+            }
+        }
+
+        // =============================================
+        // ЗАПУСК СЦЕН
+        // =============================================
+        game.scene.add('SplashScene', SplashScene);
+        game.scene.add('MainGame', MainGame);
+        game.scene.add('GameOverScene', GameOverScene);
+        game.scene.start('SplashScene');
     </script>
 </body>
 </html>
