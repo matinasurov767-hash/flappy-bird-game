@@ -124,6 +124,7 @@
                 this.sounds = {};
                 this.muted = false;
                 this.soundToggle = document.getElementById('sound-toggle');
+                this.backgroundMusic = null;
                 
                 this.soundToggle.addEventListener('click', () => {
                     this.toggleMute();
@@ -145,32 +146,58 @@
                 }
             }
 
+            playBackgroundMusic() {
+                if (this.muted) return;
+                
+                const bgSound = this.sounds['background'];
+                if (bgSound && !this.backgroundMusic) {
+                    this.backgroundMusic = new Audio(bgSound.audio);
+                    this.backgroundMusic.volume = bgSound.volume || 0.3;
+                    this.backgroundMusic.loop = true;
+                    this.backgroundMusic.play().catch(e => console.log('Background music play failed:', e));
+                }
+            }
+
+            stopBackgroundMusic() {
+                if (this.backgroundMusic) {
+                    this.backgroundMusic.pause();
+                    this.backgroundMusic.currentTime = 0;
+                    this.backgroundMusic = null;
+                }
+            }
+
             toggleMute() {
                 this.muted = !this.muted;
                 this.soundToggle.textContent = this.muted ? '🔇' : '🔊';
+                
+                if (this.muted) {
+                    this.stopBackgroundMusic();
+                } else {
+                    this.playBackgroundMusic();
+                }
             }
         }
 
         const soundManager = new SoundManager();
 
-        // Добавляем звуки (используем базовые тоны)
+        // Добавляем звуки из папки sounds
         soundManager.addSound('flap', {
-            audio: 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==',
+            audio: 'sounds/flap.wav',
             volume: 0.3
         });
 
         soundManager.addSound('score', {
-            audio: 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==',
+            audio: 'sounds/score.wav',
             volume: 0.5
         });
 
         soundManager.addSound('hit', {
-            audio: 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==',
+            audio: 'sounds/hit.wav',
             volume: 0.7
         });
 
         soundManager.addSound('background', {
-            audio: 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==',
+            audio: 'sounds/background.mp3',
             volume: 0.2
         });
 
@@ -337,7 +364,7 @@
                 });
 
                 // Запускаем фоновую музыку
-                soundManager.playSound('background');
+                soundManager.playBackgroundMusic();
             }
 
             update() {
@@ -439,6 +466,8 @@
                     this.pipeTimer.remove();
                 }
                 this.pipes.clear(true, true);
+                // Останавливаем фоновую музыку при выходе из игры
+                soundManager.stopBackgroundMusic();
             }
         }
 
