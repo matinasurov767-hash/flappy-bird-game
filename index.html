@@ -43,11 +43,26 @@
             z-index: 1000;
             display: none;
         }
+        #sound-toggle {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.5);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            font-size: 16px;
+            cursor: pointer;
+            z-index: 1000;
+        }
     </style>
 </head>
 <body>
     <div id="game-container"></div>
     <div id="ad-container">Реклама · Поддержите разработчика</div>
+    <button id="sound-toggle">🔊</button>
     
     <script>
         // =============================================
@@ -102,6 +117,64 @@
         const adManager = new AdManager();
 
         // =============================================
+        // МЕНЕДЖЕР ЗВУКА
+        // =============================================
+        class SoundManager {
+            constructor() {
+                this.sounds = {};
+                this.muted = false;
+                this.soundToggle = document.getElementById('sound-toggle');
+                
+                this.soundToggle.addEventListener('click', () => {
+                    this.toggleMute();
+                });
+            }
+
+            addSound(key, config) {
+                this.sounds[key] = config;
+            }
+
+            playSound(key, volume = 1) {
+                if (this.muted) return;
+                
+                const sound = this.sounds[key];
+                if (sound && sound.audio) {
+                    const audio = new Audio(sound.audio);
+                    audio.volume = volume * (sound.volume || 1);
+                    audio.play().catch(e => console.log('Audio play failed:', e));
+                }
+            }
+
+            toggleMute() {
+                this.muted = !this.muted;
+                this.soundToggle.textContent = this.muted ? '🔇' : '🔊';
+            }
+        }
+
+        const soundManager = new SoundManager();
+
+        // Добавляем звуки (используем базовые тоны)
+        soundManager.addSound('flap', {
+            audio: 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==',
+            volume: 0.3
+        });
+
+        soundManager.addSound('score', {
+            audio: 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==',
+            volume: 0.5
+        });
+
+        soundManager.addSound('hit', {
+            audio: 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==',
+            volume: 0.7
+        });
+
+        soundManager.addSound('background', {
+            audio: 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==',
+            volume: 0.2
+        });
+
+        // =============================================
         // КОНФИГУРАЦИЯ ИГРЫ
         // =============================================
         const config = {
@@ -130,8 +203,7 @@
         class SplashScene extends Phaser.Scene {
             constructor() {
                 super({ key: 'SplashScene' });
-            this.assetsLoaded = false;
-        }
+            }
 
             preload() {
                 // Загружаем ассеты
@@ -155,7 +227,6 @@
                 this.load.on('complete', () => {
                     progressBar.destroy();
                     progressBox.destroy();
-                    this.assetsLoaded = true;
                 });
             }
 
@@ -199,17 +270,13 @@
                 });
 
                 startButton.on('pointerdown', () => {
-                    if (this.assetsLoaded) {
-                        this.scene.start('MainGame');
-                    }
+                    this.scene.start('MainGame');
                 });
 
-                // Автопереход через 3 секунды после загрузки
-                if (this.assetsLoaded) {
-                    this.time.delayedCall(3000, () => {
-                        this.scene.start('MainGame');
-                    });
-                }
+                // Автопереход через 3 секунды
+                this.time.delayedCall(3000, () => {
+                    this.scene.start('MainGame');
+                });
             }
         }
 
@@ -219,9 +286,14 @@
         class MainGame extends Phaser.Scene {
             constructor() {
                 super({ key: 'MainGame' });
-            this.score = 0;
-            this.gameOver = false;
-        }
+            }
+
+            init() {
+                // Сбрасываем состояние игры при каждом запуске
+                this.score = 0;
+                this.gameOver = false;
+                this.pipeTimer = null;
+            }
 
             create() {
                 // Фон
@@ -263,6 +335,9 @@
                     callbackScope: this, 
                     loop: true 
                 });
+
+                // Запускаем фоновую музыку
+                soundManager.playSound('background');
             }
 
             update() {
@@ -286,6 +361,7 @@
                         pipe.passed = true;
                         this.score += 0.5;
                         this.scoreText.setText('Счёт: ' + Math.floor(this.score));
+                        soundManager.playSound('score');
                     }
                 });
             }
@@ -293,6 +369,7 @@
             flap() {
                 if (this.gameOver) return;
                 this.bird.setVelocityY(-350);
+                soundManager.playSound('flap');
             }
 
             addPipe() {
@@ -323,8 +400,23 @@
             }
 
             endGame() {
+                if (this.gameOver) return; // Защита от повторного вызова
+                
                 this.gameOver = true;
                 this.bird.setTint(0xFF0000);
+                
+                // Останавливаем генерацию труб
+                if (this.pipeTimer) {
+                    this.pipeTimer.remove();
+                }
+                
+                // Останавливаем движение труб
+                this.pipes.children.iterate(pipe => {
+                    pipe.setVelocityX(0);
+                });
+                
+                // Проигрываем звук удара
+                soundManager.playSound('hit');
                 
                 // Сохраняем рекорд
                 const finalScore = Math.floor(this.score);
@@ -332,11 +424,21 @@
                     localStorage.setItem('flappyBestScore', finalScore);
                 }
                 
-                // Переход на сцену окончания
-                this.scene.start('GameOverScene', { 
-                    score: finalScore,
-                    bestScore: Math.max(finalScore, this.bestScore)
+                // Задержка перед переходом на сцену окончания
+                this.time.delayedCall(1000, () => {
+                    this.scene.start('GameOverScene', { 
+                        score: finalScore,
+                        bestScore: Math.max(finalScore, this.bestScore)
+                    });
                 });
+            }
+
+            shutdown() {
+                // Очищаем ресурсы при закрытии сцены
+                if (this.pipeTimer) {
+                    this.pipeTimer.remove();
+                }
+                this.pipes.clear(true, true);
             }
         }
 
