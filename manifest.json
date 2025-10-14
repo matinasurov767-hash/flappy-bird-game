@@ -1,10 +1,10 @@
 {
   "name": "Flappy Bird by Matin",
   "short_name": "Flappy Bird",
-  "description": "Fly through pipes in this addictive Flappy Bird game!",
+  "description": "Fly through pipes in this addictive Flappy Bird game with bonuses and records!",
   "start_url": "/flappy-bird-game/",
   "display": "fullscreen",
-  "background_color": "#87CEEB",
+  "background_color": "#1a1a2e",
   "theme_color": "#1E90FF",
   "orientation": "portrait",
   "icons": [
@@ -18,5 +18,6 @@
       "sizes": "512x512",
       "type": "image/png"
     }
-  ]
+  ],
+  "categories": ["game", "entertainment"]
 }
