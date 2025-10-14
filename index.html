@@ -57,12 +57,25 @@
             cursor: pointer;
             z-index: 1000;
         }
+        #audio-notification {
+            position: absolute;
+            top: 50px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 10px;
+            font-size: 12px;
+            z-index: 1000;
+            display: none;
+        }
     </style>
 </head>
 <body>
     <div id="game-container"></div>
     <div id="ad-container">Реклама · Поддержите разработчика</div>
     <button id="sound-toggle">🔊</button>
+    <div id="audio-notification">Нажмите для включения звука</div>
     
     <script>
         // =============================================
@@ -117,18 +130,72 @@
         const adManager = new AdManager();
 
         // =============================================
-        // МЕНЕДЖЕР ЗВУКА
+        // УЛУЧШЕННЫЙ МЕНЕДЖЕР ЗВУКА
         // =============================================
         class SoundManager {
             constructor() {
                 this.sounds = {};
                 this.muted = false;
+                this.audioContext = null;
+                this.audioUnlocked = false;
                 this.soundToggle = document.getElementById('sound-toggle');
+                this.audioNotification = document.getElementById('audio-notification');
                 this.backgroundMusic = null;
                 
                 this.soundToggle.addEventListener('click', () => {
                     this.toggleMute();
                 });
+
+                // Показываем уведомление о необходимости взаимодействия
+                this.showAudioNotification();
+
+                // Разблокируем аудио при любом взаимодействии с игрой
+                this.unlockAudioOnInteraction();
+            }
+
+            // Показываем уведомление о необходимости включения звука
+            showAudioNotification() {
+                if (!this.audioUnlocked) {
+                    this.audioNotification.style.display = 'block';
+                    setTimeout(() => {
+                        this.audioNotification.style.display = 'none';
+                    }, 3000);
+                }
+            }
+
+            // Разблокировка аудио при взаимодействии пользователя
+            unlockAudioOnInteraction() {
+                const unlockAudio = () => {
+                    if (!this.audioUnlocked) {
+                        this.audioUnlocked = true;
+                        this.audioNotification.style.display = 'none';
+                        
+                        // Создаем и воспроизводим короткий беззвучный звук для разблокировки
+                        if (!this.audioContext) {
+                            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        }
+                        
+                        if (this.audioContext.state === 'suspended') {
+                            this.audioContext.resume();
+                        }
+                        
+                        // Воспроизводим короткий беззвучный звук
+                        const oscillator = this.audioContext.createOscillator();
+                        const gainNode = this.audioContext.createGain();
+                        gainNode.gain.value = 0; // Беззвучно
+                        oscillator.connect(gainNode);
+                        gainNode.connect(this.audioContext.destination);
+                        oscillator.start();
+                        oscillator.stop(this.audioContext.currentTime + 0.1);
+                        
+                        console.log('Аудио разблокировано!');
+                    }
+                };
+
+                // Разблокируем при клике в любом месте
+                document.addEventListener('click', unlockAudio, { once: true });
+                document.addEventListener('touchstart', unlockAudio, { once: true });
+                document.addEventListener('keydown', unlockAudio, { once: true });
             }
 
             addSound(key, config) {
@@ -136,25 +203,68 @@
             }
 
             playSound(key, volume = 1) {
-                if (this.muted) return;
+                if (this.muted || !this.audioUnlocked) return;
                 
                 const sound = this.sounds[key];
                 if (sound && sound.audio) {
-                    const audio = new Audio(sound.audio);
+                    // Создаем новый объект Audio каждый раз для надежности
+                    const audio = new Audio();
+                    audio.src = sound.audio;
                     audio.volume = volume * (sound.volume || 1);
-                    audio.play().catch(e => console.log('Audio play failed:', e));
+                    
+                    // Обработчик успешного воспроизведения
+                    const playPromise = audio.play();
+                    
+                    if (playPromise !== undefined) {
+                        playPromise.catch(error => {
+                            console.log(`Ошибка воспроизведения звука ${key}:`, error);
+                            // Пытаемся разблокировать аудио при ошибке
+                            if (!this.audioUnlocked) {
+                                this.unlockAudioOnInteraction();
+                            }
+                        });
+                    }
                 }
             }
 
             playBackgroundMusic() {
                 if (this.muted) return;
                 
+                // Если аудио еще не разблокировано, показываем уведомление
+                if (!this.audioUnlocked) {
+                    this.showAudioNotification();
+                    return;
+                }
+                
                 const bgSound = this.sounds['background'];
                 if (bgSound && !this.backgroundMusic) {
-                    this.backgroundMusic = new Audio(bgSound.audio);
-                    this.backgroundMusic.volume = bgSound.volume || 0.3;
+                    this.backgroundMusic = new Audio();
+                    this.backgroundMusic.src = bgSound.audio;
+                    this.backgroundMusic.volume = bgSound.volume || 0.2;
                     this.backgroundMusic.loop = true;
-                    this.backgroundMusic.play().catch(e => console.log('Background music play failed:', e));
+                    
+                    // Пытаемся воспроизвести с обработкой ошибок
+                    const playPromise = this.backgroundMusic.play();
+                    
+                    if (playPromise !== undefined) {
+                        playPromise.then(() => {
+                            console.log('Фоновая музыка запущена');
+                        }).catch(error => {
+                            console.log('Ошибка воспроизведения фоновой музыки:', error);
+                            this.backgroundMusic = null;
+                            
+                            // Показываем уведомление, что нужно взаимодействие
+                            this.showAudioNotification();
+                        });
+                    }
+                } else if (this.backgroundMusic) {
+                    // Если музыка уже есть, но приостановлена - возобновляем
+                    const playPromise = this.backgroundMusic.play();
+                    if (playPromise !== undefined) {
+                        playPromise.catch(error => {
+                            console.log('Ошибка возобновления музыки:', error);
+                        });
+                    }
                 }
             }
 
@@ -162,7 +272,6 @@
                 if (this.backgroundMusic) {
                     this.backgroundMusic.pause();
                     this.backgroundMusic.currentTime = 0;
-                    this.backgroundMusic = null;
                 }
             }
 
@@ -173,8 +282,16 @@
                 if (this.muted) {
                     this.stopBackgroundMusic();
                 } else {
+                    // При включении звука пытаемся запустить музыку
                     this.playBackgroundMusic();
                 }
+            }
+
+            // Метод для принудительной разблокировки аудио
+            forceUnlockAudio() {
+                this.audioUnlocked = true;
+                this.audioNotification.style.display = 'none';
+                this.playBackgroundMusic();
             }
         }
 
@@ -280,7 +397,7 @@
                     fill: '#CCCCCC'
                 }).setOrigin(0.5);
 
-                // Кнопка начала игры
+                // Кнопка начала игры с принудительной разблокировкой аудио
                 const startButton = this.add.text(config.width/2, 350, 'НАЧАТЬ ИГРУ', {
                     fontSize: '20px',
                     fill: '#FFFFFF',
@@ -297,11 +414,14 @@
                 });
 
                 startButton.on('pointerdown', () => {
+                    // Принудительно разблокируем аудио при начале игры
+                    soundManager.forceUnlockAudio();
                     this.scene.start('MainGame');
                 });
 
                 // Автопереход через 3 секунды
                 this.time.delayedCall(3000, () => {
+                    soundManager.forceUnlockAudio();
                     this.scene.start('MainGame');
                 });
             }
@@ -352,8 +472,13 @@
                     fill: '#FFD700'
                 });
                 
-                // Управление
-                this.input.on('pointerdown', this.flap, this);
+                // Управление - при первом клике также разблокируем аудио
+                this.input.on('pointerdown', () => {
+                    if (!soundManager.audioUnlocked) {
+                        soundManager.forceUnlockAudio();
+                    }
+                    this.flap();
+                });
                 
                 // Генерация труб
                 this.pipeTimer = this.time.addEvent({ 
@@ -363,8 +488,10 @@
                     loop: true 
                 });
 
-                // Запускаем фоновую музыку
-                soundManager.playBackgroundMusic();
+                // Запускаем фоновую музыку с задержкой для надежности
+                this.time.delayedCall(500, () => {
+                    soundManager.playBackgroundMusic();
+                });
             }
 
             update() {
@@ -466,8 +593,6 @@
                     this.pipeTimer.remove();
                 }
                 this.pipes.clear(true, true);
-                // Останавливаем фоновую музыку при выходе из игры
-                soundManager.stopBackgroundMusic();
             }
         }
 
