@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Генератор ассетов</title>
+</head>
+<body>
+    <h2>Создание ассетов для игры</h2>
+    
+    <!-- bird.png -->
+    <canvas id="birdCanvas" width="40" height="40"></canvas>
+    <a id="birdLink" download="bird.png">Скачать bird.png</a>
+    
+    <br><br>
+    
+    <!-- pipe.png -->
+    <canvas id="pipeCanvas" width="80" height="400"></canvas>
+    <a id="pipeLink" download="pipe.png">Скачать pipe.png</a>
+    
+    <br><br>
+    
+    <!-- background.png -->
+    <canvas id="bgCanvas" width="360" height="640"></canvas>
+    <a id="bgLink" download="background.png">Скачать background.png</a>
+
+    <script>
+        // Генерация bird.png
+        const birdCanvas = document.getElementById('birdCanvas');
+        const birdCtx = birdCanvas.getContext('2d');
+        
+        // Желтый круг
+        birdCtx.fillStyle = '#FFD700';
+        birdCtx.beginPath();
+        birdCtx.arc(20, 20, 18, 0, Math.PI * 2);
+        birdCtx.fill();
+        
+        // Глаз
+        birdCtx.fillStyle = '#000';
+        birdCtx.beginPath();
+        birdCtx.arc(28, 15, 4, 0, Math.PI * 2);
+        birdCtx.fill();
+        
+        // Клюв
+        birdCtx.fillStyle = '#FF8C00';
+        birdCtx.beginPath();
+        birdCtx.moveTo(35, 20);
+        birdCtx.lineTo(40, 18);
+        birdCtx.lineTo(40, 22);
+        birdCtx.fill();
+
+        // Генерация pipe.png
+        const pipeCanvas = document.getElementById('pipeCanvas');
+        const pipeCtx = pipeCanvas.getContext('2d');
+        
+        // Зеленый прямоугольник
+        pipeCtx.fillStyle = '#228B22';
+        pipeCtx.fillRect(0, 0, 80, 400);
+        
+        // Темно-зеленая окантовка
+        pipeCtx.strokeStyle = '#006400';
+        pipeCtx.lineWidth = 4;
+        pipeCtx.strokeRect(2, 2, 76, 396);
+
+        // Генерация background.png
+        const bgCanvas = document.getElementById('bgCanvas');
+        const bgCtx = bgCanvas.getContext('2d');
+        
+        // Градиентное небо
+        const gradient = bgCtx.createLinearGradient(0, 0, 0, 640);
+        gradient.addColorStop(0, '#87CEEB'); // светло-синий
+        gradient.addColorStop(1, '#1E90FF'); // темно-синий
+        
+        bgCtx.fillStyle = gradient;
+        bgCtx.fillRect(0, 0, 360, 640);
+        
+        // Облака
+        bgCtx.fillStyle = 'white';
+        bgCtx.beginPath();
+        bgCtx.arc(100, 80, 20, 0, Math.PI * 2);
+        bgCtx.arc(120, 70, 25, 0, Math.PI * 2);
+        bgCtx.arc(140, 80, 20, 0, Math.PI * 2);
+        bgCtx.fill();
+        
+        bgCtx.beginPath();
+        bgCtx.arc(250, 150, 25, 0, Math.PI * 2);
+        bgCtx.arc(270, 140, 30, 0, Math.PI * 2);
+        bgCtx.arc(290, 150, 25, 0, Math.PI * 2);
+        bgCtx.fill();
+
+        // Создание ссылок для скачивания
+        document.getElementById('birdLink').href = birdCanvas.toDataURL('image/png');
+        document.getElementById('pipeLink').href = pipeCanvas.toDataURL('image/png');
+        document.getElementById('bgLink').href = bgCanvas.toDataURL('image/png');
+    </script>
+</body>
+</html>

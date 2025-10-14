@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flappy Phaser для Telegram</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.js"></script>
+    <style>
+        body { 
+            margin: 0; 
+            padding: 0; 
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #game-container {
+            max-width: 100%;
+            max-height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container"></div>
+    <script>
+        // Интеграция с Telegram Web App
+        let tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+        }
+
+        const config = {
+            type: Phaser.AUTO,
+            parent: 'game-container',
+            width: 360, // Оптимально для мобильных
+            height: 640,
+            physics: { 
+                default: 'arcade', 
+                arcade: { 
+                    gravity: { y: 800 },
+                    debug: false
+                } 
+            },
+            scene: {
+                preload: preload,
+                create: create,
+                update: update
+            },
+            scale: {
+                mode: Phaser.Scale.FIT,
+                autoCenter: Phaser.Scale.CENTER_BOTH
+            }
+        };
+
+        const game = new Phaser.Game(config);
+        let bird, pipes, score = 0, scoreText, gameOver = false;
+        let spaceKey, flapVelocity = -350;
+        let pipeInterval = 1500;
+
+        function preload() {
+            // Простые геометрические формы если нет ассетов
+            this.load.image('bird', 'assets/bird.png');
+            this.load.image('pipe', 'assets/pipe.png');
+            this.load.image('background', 'assets/background.png');
+        }
+
+        function create() {
+            // Фон
+            this.add.image(config.width/2, config.height/2, 'background')
+                .setDisplaySize(config.width, config.height);
+
+            // Птица
+            bird = this.physics.add.sprite(80, config.height/2, 'bird');
+            bird.setCollideWorldBounds(true);
+            
+            // Группа труб
+            pipes = this.physics.add.group();
+            
+            // Коллайдер
+            this.physics.add.collider(bird, pipes, hitPipe, null, this);
+            
+            // Счет
+            scoreText = this.add.text(20, 20, 'Счёт: 0', { 
+                fontSize: '24px', 
+                fill: '#FFF',
+                fontFamily: 'Arial',
+                stroke: '#000',
+                strokeThickness: 4
+            });
+            
+            // Управление
+            this.input.on('pointerdown', flap);
+            spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+            spaceKey.on('down', flap);
+            
+            // Генерация труб
+            this.time.addEvent({ 
+                delay: pipeInterval, 
+                callback: addPipe, 
+                callbackScope: this, 
+                loop: true 
+            });
+        }
+
+        function update() {
+            if (gameOver) return;
+            
+            // Поворот птицы в зависимости от скорости
+            if (bird.body.velocity.y < 0) {
+                bird.rotation = -0.3;
+            } else {
+                bird.rotation = Phaser.Math.Clamp(bird.body.velocity.y / 400, -0.3, 0.5);
+            }
+            
+            // Конец игры если упала или улетела вверх
+            if (bird.y > config.height - 10 || bird.y < -10) {
+                endGame();
+            }
+            
+            // Обновление счета
+            pipes.children.iterate(pipe => {
+                if (!pipe.passed && pipe.x < bird.x - 10 && pipe.texture.key === 'pipe') {
+                    pipe.passed = true;
+                    score += 0.5; // +0.5 за каждую трубу (верхнюю и нижнюю)
+                    scoreText.setText('Счёт: ' + Math.floor(score));
+                }
+            });
+        }
+
+        function flap() {
+            if (gameOver) {
+                // Рестарт игры
+                score = 0;
+                gameOver = false;
+                bird.setTint(0xFFFFFF);
+                bird.setVelocityY(0);
+                bird.y = config.height/2;
+                bird.rotation = 0;
+                pipes.clear(true, true);
+                scoreText.setText('Счёт: 0');
+                return;
+            }
+            
+            bird.setVelocityY(flapVelocity);
+        }
+
+        function addPipe() {
+            if (gameOver) return;
+            
+            const gap = 180;
+            const pipeWidth = 52;
+            const holePosition = Phaser.Math.Between(120, config.height - 120);
+            
+            // Верхняя труба
+            const topPipe = pipes.create(config.width, holePosition - gap/2, 'pipe');
+            topPipe.setOrigin(0.5, 1);
+            topPipe.setImmovable(true);
+            topPipe.body.allowGravity = false;
+            topPipe.setVelocityX(-200);
+            
+            // Нижняя труба  
+            const bottomPipe = pipes.create(config.width, holePosition + gap/2, 'pipe');
+            bottomPipe.setOrigin(0.5, 0);
+            bottomPipe.setImmovable(true);
+            bottomPipe.body.allowGravity = false;
+            bottomPipe.setVelocityX(-200);
+        }
+
+        function hitPipe() {
+            if (!gameOver) {
+                endGame();
+            }
+        }
+
+        function endGame() {
+            gameOver = true;
+            bird.setTint(0xFF0000);
+            bird.setVelocityY(-200);
+            
+            // Финал счета
+            scoreText.setText('Игра окончена!\nСчёт: ' + Math.floor(score) + '\nТапни для рестарта');
+            scoreText.setPosition(config.width/2, config.height/2);
+            scoreText.setOrigin(0.5);
+            
+            // Отправка счета в Telegram
+            if (tg) {
+                tg.sendData(JSON.stringify({ 
+                    action: 'game_over',
+                    score: Math.floor(score)
+                }));
+            }
+        }
+    </script>
+</body>
+</html>
