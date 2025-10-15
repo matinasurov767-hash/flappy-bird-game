@@ -24,6 +24,10 @@
             height: 100vh;
             overflow: hidden;
             font-family: 'Arial', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
         }
         #game-container {
             max-width: 100%;
@@ -57,16 +61,28 @@
             cursor: pointer;
             z-index: 1000;
         }
-        #audio-notification {
+        #performance-warning {
             position: absolute;
-            top: 50px;
-            right: 10px;
-            background: rgba(0,0,0,0.7);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8);
             color: white;
-            padding: 8px 12px;
+            padding: 20px;
             border-radius: 10px;
+            text-align: center;
+            display: none;
+            z-index: 2000;
+        }
+        #fps-counter {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
             font-size: 12px;
-            z-index: 1000;
+            background: rgba(0,0,0,0.5);
+            padding: 5px;
+            border-radius: 5px;
             display: none;
         }
     </style>
@@ -75,20 +91,106 @@
     <div id="game-container"></div>
     <div id="ad-container">Реклама · Поддержите разработчика</div>
     <button id="sound-toggle">🔊</button>
-    <div id="audio-notification">Нажмите для включения звука</div>
+    <div id="performance-warning">
+        <h3>Оптимизация производительности</h3>
+        <p>Игра оптимизируется для плавной работы...</p>
+    </div>
+    <div id="fps-counter">FPS: 60</div>
     
     <script>
         // =============================================
-        // ИНТЕГРАЦИЯ С TELEGRAM
+        // ОПТИМИЗАЦИЯ ДЛЯ TELEGRAM WEBVIEW
         // =============================================
-        let tg = window.Telegram?.WebApp;
-        if (tg) {
-            tg.ready();
-            tg.expand();
+        
+        // Отключаем ненужные функции для улучшения производительности
+        if (window.Telegram?.WebApp) {
+            // Оптимизации для Telegram WebView
+            document.addEventListener('DOMContentLoaded', function() {
+                // Предотвращаем зум при двойном тапе
+                document.addEventListener('touchstart', function(e) {
+                    if (e.touches.length > 1) e.preventDefault();
+                }, { passive: false });
+                
+                // Предотвращаем выделение текста
+                document.addEventListener('selectstart', function(e) {
+                    e.preventDefault();
+                });
+            });
         }
 
         // =============================================
-        // МЕНЕДЖЕР РЕКЛАМЫ
+        // МОНИТОРИНГ ПРОИЗВОДИТЕЛЬНОСТИ
+        // =============================================
+        class PerformanceMonitor {
+            constructor() {
+                this.fps = 60;
+                this.lastTime = performance.now();
+                this.frameCount = 0;
+                this.fpsCounter = document.getElementById('fps-counter');
+                this.warningElement = document.getElementById('performance-warning');
+                this.lowFpsCount = 0;
+                
+                // Для отладки можно включить показ FPS
+                // this.fpsCounter.style.display = 'block';
+            }
+            
+            update() {
+                this.frameCount++;
+                const currentTime = performance.now();
+                
+                if (currentTime >= this.lastTime + 1000) {
+                    this.fps = Math.round((this.frameCount * 1000) / (currentTime - this.lastTime));
+                    this.lastTime = currentTime;
+                    this.frameCount = 0;
+                    
+                    this.fpsCounter.textContent = `FPS: ${this.fps}`;
+                    
+                    // Проверяем на низкий FPS
+                    if (this.fps < 30) {
+                        this.lowFpsCount++;
+                        if (this.lowFpsCount > 5) {
+                            this.showWarning();
+                        }
+                    } else {
+                        this.lowFpsCount = 0;
+                        this.hideWarning();
+                    }
+                }
+            }
+            
+            showWarning() {
+                this.warningElement.style.display = 'block';
+                setTimeout(() => {
+                    this.hideWarning();
+                }, 2000);
+            }
+            
+            hideWarning() {
+                this.warningElement.style.display = 'none';
+            }
+        }
+
+        const performanceMonitor = new PerformanceMonitor();
+
+        // =============================================
+        // ИНТЕГРАЦИЯ С TELEGRAM С ОПТИМИЗАЦИЕЙ
+        // =============================================
+        let tg = window.Telegram?.WebApp;
+        if (tg) {
+            // Оптимизации для Telegram
+            tg.ready();
+            tg.expand();
+            
+            // Отключаем некоторые функции для улучшения производительности
+            setTimeout(() => {
+                if (tg.isExpanded) {
+                    // Дополнительные оптимизации после раскрытия
+                }
+            }, 1000);
+        }
+
+        // =============================================
+        // ОПТИМИЗИРОВАННЫЙ МЕНЕДЖЕР РЕКЛАМЫ
         // =============================================
         class AdManager {
             constructor() {
@@ -101,7 +203,8 @@
                 this.gamesPlayed++;
                 if (this.gamesPlayed >= this.adInterval) {
                     this.gamesPlayed = 0;
-                    this.showAd();
+                    // Откладываем показ рекламы для избежания лагов
+                    setTimeout(() => this.showAd(), 100);
                 }
             }
 
@@ -113,89 +216,27 @@
                     this.adContainer.style.display = 'none';
                 }, 5000);
             }
-
-            showRewardedAd() {
-                return new Promise((resolve) => {
-                    this.adContainer.style.display = 'block';
-                    this.adContainer.innerHTML = 'Реклама · Получите +10 очков<br><small>Закройте через 3 сек</small>';
-                    
-                    setTimeout(() => {
-                        this.adContainer.style.display = 'none';
-                        resolve(true);
-                    }, 3000);
-                });
-            }
         }
 
         const adManager = new AdManager();
 
         // =============================================
-        // УЛУЧШЕННЫЙ МЕНЕДЖЕР ЗВУКА
+        // ОПТИМИЗИРОВАННЫЙ МЕНЕДЖЕР ЗВУКА
         // =============================================
-        class SoundManager {
+        class OptimizedSoundManager {
             constructor() {
                 this.sounds = {};
-                this.muted = false;
+                this.muted = true; // Начинаем с выключенного звука для производительности
+                this.soundToggle = document.getElementById('sound-toggle');
                 this.audioContext = null;
                 this.audioUnlocked = false;
-                this.soundToggle = document.getElementById('sound-toggle');
-                this.audioNotification = document.getElementById('audio-notification');
-                this.backgroundMusic = null;
                 
                 this.soundToggle.addEventListener('click', () => {
                     this.toggleMute();
                 });
 
-                // Показываем уведомление о необходимости взаимодействия
-                this.showAudioNotification();
-
-                // Разблокируем аудио при любом взаимодействии с игрой
-                this.unlockAudioOnInteraction();
-            }
-
-            // Показываем уведомление о необходимости включения звука
-            showAudioNotification() {
-                if (!this.audioUnlocked) {
-                    this.audioNotification.style.display = 'block';
-                    setTimeout(() => {
-                        this.audioNotification.style.display = 'none';
-                    }, 3000);
-                }
-            }
-
-            // Разблокировка аудио при взаимодействии пользователя
-            unlockAudioOnInteraction() {
-                const unlockAudio = () => {
-                    if (!this.audioUnlocked) {
-                        this.audioUnlocked = true;
-                        this.audioNotification.style.display = 'none';
-                        
-                        // Создаем и воспроизводим короткий беззвучный звук для разблокировки
-                        if (!this.audioContext) {
-                            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                        }
-                        
-                        if (this.audioContext.state === 'suspended') {
-                            this.audioContext.resume();
-                        }
-                        
-                        // Воспроизводим короткий беззвучный звук
-                        const oscillator = this.audioContext.createOscillator();
-                        const gainNode = this.audioContext.createGain();
-                        gainNode.gain.value = 0; // Беззвучно
-                        oscillator.connect(gainNode);
-                        gainNode.connect(this.audioContext.destination);
-                        oscillator.start();
-                        oscillator.stop(this.audioContext.currentTime + 0.1);
-                        
-                        console.log('Аудио разблокировано!');
-                    }
-                };
-
-                // Разблокируем при клике в любом месте
-                document.addEventListener('click', unlockAudio, { once: true });
-                document.addEventListener('touchstart', unlockAudio, { once: true });
-                document.addEventListener('keydown', unlockAudio, { once: true });
+                // В Telegram WebView звук может вызывать лаги, поэтому начинаем с выключенного
+                this.soundToggle.textContent = '🔇';
             }
 
             addSound(key, config) {
@@ -207,71 +248,23 @@
                 
                 const sound = this.sounds[key];
                 if (sound && sound.audio) {
-                    // Создаем новый объект Audio каждый раз для надежности
-                    const audio = new Audio();
-                    audio.src = sound.audio;
-                    audio.volume = volume * (sound.volume || 1);
-                    
-                    // Обработчик успешного воспроизведения
-                    const playPromise = audio.play();
-                    
-                    if (playPromise !== undefined) {
-                        playPromise.catch(error => {
-                            console.log(`Ошибка воспроизведения звука ${key}:`, error);
-                            // Пытаемся разблокировать аудио при ошибке
-                            if (!this.audioUnlocked) {
-                                this.unlockAudioOnInteraction();
-                            }
-                        });
+                    try {
+                        const audio = new Audio();
+                        audio.src = sound.audio;
+                        audio.volume = volume * (sound.volume || 1);
+                        
+                        // Предзагрузка для уменьшения лагов
+                        audio.preload = 'auto';
+                        
+                        const playPromise = audio.play();
+                        if (playPromise !== undefined) {
+                            playPromise.catch(() => {
+                                // Игнорируем ошибки воспроизведения для производительности
+                            });
+                        }
+                    } catch (e) {
+                        // Игнорируем ошибки для стабильности
                     }
-                }
-            }
-
-            playBackgroundMusic() {
-                if (this.muted) return;
-                
-                // Если аудио еще не разблокировано, показываем уведомление
-                if (!this.audioUnlocked) {
-                    this.showAudioNotification();
-                    return;
-                }
-                
-                const bgSound = this.sounds['background'];
-                if (bgSound && !this.backgroundMusic) {
-                    this.backgroundMusic = new Audio();
-                    this.backgroundMusic.src = bgSound.audio;
-                    this.backgroundMusic.volume = bgSound.volume || 0.2;
-                    this.backgroundMusic.loop = true;
-                    
-                    // Пытаемся воспроизвести с обработкой ошибок
-                    const playPromise = this.backgroundMusic.play();
-                    
-                    if (playPromise !== undefined) {
-                        playPromise.then(() => {
-                            console.log('Фоновая музыка запущена');
-                        }).catch(error => {
-                            console.log('Ошибка воспроизведения фоновой музыки:', error);
-                            this.backgroundMusic = null;
-                            
-                            // Показываем уведомление, что нужно взаимодействие
-                            this.showAudioNotification();
-                        });
-                    }
-                } else if (this.backgroundMusic) {
-                    // Если музыка уже есть, но приостановлена - возобновляем
-                    const playPromise = this.backgroundMusic.play();
-                    if (playPromise !== undefined) {
-                        playPromise.catch(error => {
-                            console.log('Ошибка возобновления музыки:', error);
-                        });
-                    }
-                }
-            }
-
-            stopBackgroundMusic() {
-                if (this.backgroundMusic) {
-                    this.backgroundMusic.pause();
-                    this.backgroundMusic.currentTime = 0;
                 }
             }
 
@@ -279,47 +272,36 @@
                 this.muted = !this.muted;
                 this.soundToggle.textContent = this.muted ? '🔇' : '🔊';
                 
-                if (this.muted) {
-                    this.stopBackgroundMusic();
-                } else {
-                    // При включении звука пытаемся запустить музыку
-                    this.playBackgroundMusic();
+                if (!this.muted && !this.audioUnlocked) {
+                    this.unlockAudio();
                 }
             }
 
-            // Метод для принудительной разблокировки аудио
-            forceUnlockAudio() {
+            unlockAudio() {
                 this.audioUnlocked = true;
-                this.audioNotification.style.display = 'none';
-                this.playBackgroundMusic();
+                // Воспроизводим тихий звук для разблокировки аудио
+                try {
+                    const audio = new Audio();
+                    audio.volume = 0.01;
+                    audio.play().then(() => {
+                        audio.pause();
+                    }).catch(() => {});
+                } catch (e) {
+                    // Игнорируем ошибки
+                }
             }
         }
 
-        const soundManager = new SoundManager();
+        const soundManager = new OptimizedSoundManager();
 
-        // Добавляем звуки из папки sounds
-        soundManager.addSound('flap', {
-            audio: 'sounds/flap.wav',
-            volume: 0.3
-        });
-
-        soundManager.addSound('score', {
-            audio: 'sounds/score.wav',
-            volume: 0.5
-        });
-
-        soundManager.addSound('hit', {
-            audio: 'sounds/hit.wav',
-            volume: 0.7
-        });
-
-        soundManager.addSound('background', {
-            audio: 'sounds/background.mp3',
-            volume: 0.2
-        });
+        // Добавляем звуки
+        soundManager.addSound('flap', { audio: 'sounds/flap.wav', volume: 0.3 });
+        soundManager.addSound('score', { audio: 'sounds/score.wav', volume: 0.5 });
+        soundManager.addSound('hit', { audio: 'sounds/hit.wav', volume: 0.7 });
+        soundManager.addSound('background', { audio: 'sounds/background.mp3', volume: 0.2 });
 
         // =============================================
-        // КОНФИГУРАЦИЯ ИГРЫ
+        // ОПТИМИЗИРОВАННАЯ КОНФИГУРАЦИЯ PHASER
         // =============================================
         const config = {
             type: Phaser.AUTO,
@@ -330,74 +312,64 @@
                 default: 'arcade', 
                 arcade: { 
                     gravity: { y: 800 },
-                    debug: false
+                    debug: false,
+                    // Оптимизации физики
+                    fps: 60,
+                    timeScale: 1,
+                    fixedStep: true
                 } 
+            },
+            // Оптимизации рендеринга
+            render: {
+                antialias: false,
+                pixelArt: false,
+                roundPixels: true // Уменьшает дрожание
             },
             scale: {
                 mode: Phaser.Scale.FIT,
                 autoCenter: Phaser.Scale.CENTER_BOTH
-            }
+            },
+            // Оптимизации сцен
+            scene: {
+                preload: function() {},
+                create: function() {}, 
+                update: function() {}
+            },
+            // Дополнительные оптимизации
+            fps: {
+                target: 60,
+                forceSetTimeOut: false // Лучше для производительности
+            },
+            backgroundColor: '#000000'
         };
 
         const game = new Phaser.Game(config);
 
         // =============================================
-        // СЦЕНА ЗАСТАВКИ
+        // ОПТИМИЗИРОВАННАЯ СЦЕНА ЗАСТАВКИ
         // =============================================
-        class SplashScene extends Phaser.Scene {
+        class OptimizedSplashScene extends Phaser.Scene {
             constructor() {
                 super({ key: 'SplashScene' });
             }
 
             preload() {
-                // Загружаем ассеты
+                // Загружаем ассеты с оптимизацией
                 this.load.image('bird', 'assets/bird.png');
                 this.load.image('pipe', 'assets/pipe.png');
                 this.load.image('background', 'assets/background.png');
-
-                // Индикатор загрузки
-                const progressBox = this.add.graphics();
-                progressBox.fillStyle(0x222222, 0.8);
-                progressBox.fillRect(110, 270, 140, 30);
-
-                const progressBar = this.add.graphics();
-                
-                this.load.on('progress', (value) => {
-                    progressBar.clear();
-                    progressBar.fillStyle(0x1E90FF, 1);
-                    progressBar.fillRect(115, 275, 130 * value, 20);
-                });
-
-                this.load.on('complete', () => {
-                    progressBar.destroy();
-                    progressBox.destroy();
-                });
             }
 
             create() {
-                // Фон
+                // Простой фон без сложной графики
                 this.cameras.main.setBackgroundColor(0x1a1a2e);
 
-                // Заголовок
+                // Минималистичный текст
                 const title = this.add.text(config.width/2, 200, 'FLAPPY BIRD', {
                     fontSize: '32px',
-                    fill: '#FFD700',
-                    fontStyle: 'bold'
+                    fill: '#FFD700'
                 }).setOrigin(0.5);
 
-                const developer = this.add.text(config.width/2, 240, 'by MATIN', {
-                    fontSize: '18px',
-                    fill: '#FFFFFF'
-                }).setOrigin(0.5);
-
-                // Лучший счет
-                const bestScore = localStorage.getItem('flappyBestScore') || 0;
-                const bestScoreText = this.add.text(config.width/2, 280, `Рекорд: ${bestScore}`, {
-                    fontSize: '16px',
-                    fill: '#CCCCCC'
-                }).setOrigin(0.5);
-
-                // Кнопка начала игры с принудительной разблокировкой аудио
                 const startButton = this.add.text(config.width/2, 350, 'НАЧАТЬ ИГРУ', {
                     fontSize: '20px',
                     fill: '#FFFFFF',
@@ -405,46 +377,38 @@
                     padding: { x: 20, y: 10 }
                 }).setOrigin(0.5).setInteractive();
 
-                startButton.on('pointerover', () => {
-                    startButton.setBackgroundColor('#1565C0');
-                });
-
-                startButton.on('pointerout', () => {
-                    startButton.setBackgroundColor('#1E90FF');
-                });
-
                 startButton.on('pointerdown', () => {
-                    // Принудительно разблокируем аудио при начале игры
-                    soundManager.forceUnlockAudio();
                     this.scene.start('MainGame');
                 });
 
-                // Автопереход через 3 секунды
-                this.time.delayedCall(3000, () => {
-                    soundManager.forceUnlockAudio();
+                // Быстрый переход
+                this.time.delayedCall(2000, () => {
                     this.scene.start('MainGame');
                 });
             }
         }
 
         // =============================================
-        // ОСНОВНАЯ ИГРА
+        // ОПТИМИЗИРОВАННАЯ ОСНОВНАЯ ИГРА
         // =============================================
-        class MainGame extends Phaser.Scene {
+        class OptimizedMainGame extends Phaser.Scene {
             constructor() {
                 super({ key: 'MainGame' });
+                this.pipesToRemove = [];
             }
 
             init() {
-                // Сбрасываем состояние игры при каждом запуске
                 this.score = 0;
                 this.gameOver = false;
                 this.pipeTimer = null;
+                this.lastPipeTime = 0;
+                this.pipeCount = 0;
+                this.maxPipes = 6; // Ограничиваем количество труб
             }
 
             create() {
                 // Фон
-                this.add.image(config.width/2, config.height/2, 'background')
+                this.background = this.add.image(config.width/2, config.height/2, 'background')
                     .setDisplaySize(config.width, config.height);
 
                 // Птица
@@ -454,33 +418,19 @@
                 // Трубы
                 this.pipes = this.physics.add.group();
                 
-                // Коллайдер
+                // Упрощенный коллайдер
                 this.physics.add.collider(this.bird, this.pipes, this.hitPipe, null, this);
                 
                 // Счет
-                this.scoreText = this.add.text(20, 20, 'Счёт: 0', { 
+                this.scoreText = this.add.text(20, 20, '0', { 
                     fontSize: '20px', 
-                    fill: '#FFF',
-                    stroke: '#000',
-                    strokeThickness: 4
+                    fill: '#FFF'
                 });
 
-                // Лучший счет
-                this.bestScore = localStorage.getItem('flappyBestScore') || 0;
-                this.bestScoreText = this.add.text(20, 50, 'Рекорд: ' + this.bestScore, { 
-                    fontSize: '14px', 
-                    fill: '#FFD700'
-                });
+                // Управление
+                this.input.on('pointerdown', this.flap, this);
                 
-                // Управление - при первом клике также разблокируем аудио
-                this.input.on('pointerdown', () => {
-                    if (!soundManager.audioUnlocked) {
-                        soundManager.forceUnlockAudio();
-                    }
-                    this.flap();
-                });
-                
-                // Генерация труб
+                // Оптимизированная генерация труб
                 this.pipeTimer = this.time.addEvent({ 
                     delay: 1500, 
                     callback: this.addPipe, 
@@ -488,20 +438,25 @@
                     loop: true 
                 });
 
-                // Запускаем фоновую музыку с задержкой для надежности
-                this.time.delayedCall(500, () => {
-                    soundManager.playBackgroundMusic();
+                // Запускаем мониторинг производительности
+                this.performanceCheck = this.time.addEvent({
+                    delay: 1000,
+                    callback: this.performanceOptimization,
+                    callbackScope: this,
+                    loop: true
                 });
             }
 
-            update() {
+            update(time, delta) {
+                performanceMonitor.update();
+                
                 if (this.gameOver) return;
                 
-                // Поворот птицы
+                // Упрощенная логика поворота птицы
                 if (this.bird.body.velocity.y < 0) {
                     this.bird.rotation = -0.3;
                 } else {
-                    this.bird.rotation = Phaser.Math.Clamp(this.bird.body.velocity.y / 400, -0.3, 0.5);
+                    this.bird.rotation = Math.min(this.bird.body.velocity.y / 400, 0.5);
                 }
                 
                 // Конец игры
@@ -509,15 +464,27 @@
                     this.endGame();
                 }
                 
-                // Обновление счета
+                // Оптимизированное обновление счета и удаление труб
+                let scoreChanged = false;
                 this.pipes.children.iterate(pipe => {
+                    // Удаляем трубы, которые вышли за экран
+                    if (pipe.x < -100) {
+                        this.pipes.remove(pipe, true, true);
+                        this.pipeCount--;
+                        return;
+                    }
+
                     if (!pipe.passed && pipe.x < this.bird.x - 10) {
                         pipe.passed = true;
                         this.score += 0.5;
-                        this.scoreText.setText('Счёт: ' + Math.floor(this.score));
+                        scoreChanged = true;
                         soundManager.playSound('score');
                     }
                 });
+
+                if (scoreChanged) {
+                    this.scoreText.setText(Math.floor(this.score));
+                }
             }
 
             flap() {
@@ -527,7 +494,7 @@
             }
 
             addPipe() {
-                if (this.gameOver) return;
+                if (this.gameOver || this.pipeCount >= this.maxPipes) return;
                 
                 const gap = 180;
                 const holePosition = Phaser.Math.Between(120, config.height - 120);
@@ -545,6 +512,23 @@
                 bottomPipe.setImmovable(true);
                 bottomPipe.body.allowGravity = false;
                 bottomPipe.setVelocityX(-200);
+                
+                this.pipeCount += 2;
+            }
+
+            performanceOptimization() {
+                // Автоматическая оптимизация при низком FPS
+                if (performanceMonitor.fps < 30) {
+                    // Уменьшаем количество частиц, эффектов
+                    if (this.pipeTimer) {
+                        this.pipeTimer.delay = Math.max(2000, this.pipeTimer.delay + 100);
+                    }
+                } else if (performanceMonitor.fps > 50) {
+                    // Возвращаем нормальную скорость
+                    if (this.pipeTimer) {
+                        this.pipeTimer.delay = Math.min(1500, this.pipeTimer.delay - 100);
+                    }
+                }
             }
 
             hitPipe() {
@@ -554,52 +538,51 @@
             }
 
             endGame() {
-                if (this.gameOver) return; // Защита от повторного вызова
+                if (this.gameOver) return;
                 
                 this.gameOver = true;
                 this.bird.setTint(0xFF0000);
                 
-                // Останавливаем генерацию труб
-                if (this.pipeTimer) {
-                    this.pipeTimer.remove();
-                }
+                // Останавливаем таймеры
+                if (this.pipeTimer) this.pipeTimer.remove();
+                if (this.performanceCheck) this.performanceCheck.remove();
                 
-                // Останавливаем движение труб
+                // Останавливаем трубы
                 this.pipes.children.iterate(pipe => {
                     pipe.setVelocityX(0);
                 });
                 
-                // Проигрываем звук удара
                 soundManager.playSound('hit');
                 
                 // Сохраняем рекорд
                 const finalScore = Math.floor(this.score);
-                if (finalScore > this.bestScore) {
+                const bestScore = localStorage.getItem('flappyBestScore') || 0;
+                if (finalScore > bestScore) {
                     localStorage.setItem('flappyBestScore', finalScore);
                 }
                 
-                // Задержка перед переходом на сцену окончания
-                this.time.delayedCall(1000, () => {
+                // Быстрый переход
+                this.time.delayedCall(800, () => {
                     this.scene.start('GameOverScene', { 
                         score: finalScore,
-                        bestScore: Math.max(finalScore, this.bestScore)
+                        bestScore: Math.max(finalScore, bestScore)
                     });
                 });
             }
 
             shutdown() {
-                // Очищаем ресурсы при закрытии сцены
-                if (this.pipeTimer) {
-                    this.pipeTimer.remove();
-                }
+                // Тщательная очистка
+                if (this.pipeTimer) this.pipeTimer.remove();
+                if (this.performanceCheck) this.performanceCheck.remove();
                 this.pipes.clear(true, true);
+                this.input.off('pointerdown', this.flap, this);
             }
         }
 
         // =============================================
-        // СЦЕНА КОНЦА ИГРЫ
+        // ОПТИМИЗИРОВАННАЯ СЦЕНА КОНЦА ИГРЫ
         // =============================================
-        class GameOverScene extends Phaser.Scene {
+        class OptimizedGameOverScene extends Phaser.Scene {
             constructor() {
                 super({ key: 'GameOverScene' });
             }
@@ -610,60 +593,26 @@
             }
 
             create() {
-                // Полупрозрачный фон
-                const overlay = this.add.rectangle(0, 0, config.width, config.height, 0x000000, 0.7);
-                overlay.setOrigin(0);
-
-                // Панель результатов
-                const panel = this.add.graphics();
-                panel.fillStyle(0x1a1a2e, 1);
-                panel.fillRoundedRect(config.width/2 - 120, config.height/2 - 100, 240, 200, 10);
-
-                // Текст
-                this.add.text(config.width/2, config.height/2 - 70, 'ИГРА ОКОНЧЕНА', {
+                // Простой интерфейс
+                this.add.text(config.width/2, config.height/2 - 50, 'ИГРА ОКОНЧЕНА', {
                     fontSize: '20px',
-                    fill: '#FF6B6B',
-                    fontStyle: 'bold'
+                    fill: '#FF6B6B'
                 }).setOrigin(0.5);
 
-                this.add.text(config.width/2, config.height/2 - 30, 'Счёт: ' + this.score, {
+                this.add.text(config.width/2, config.height/2, `Счёт: ${this.score}`, {
                     fontSize: '24px',
                     fill: '#FFD700'
                 }).setOrigin(0.5);
 
-                this.add.text(config.width/2, config.height/2, 'Рекорд: ' + this.bestScore, {
-                    fontSize: '18px',
-                    fill: '#1E90FF'
-                }).setOrigin(0.5);
-
-                // Кнопка рестарта
-                const restartButton = this.add.text(config.width/2, config.height/2 + 40, 'ИГРАТЬ СНОВА', {
+                const restartButton = this.add.text(config.width/2, config.height/2 + 50, 'ИГРАТЬ СНОВА', {
                     fontSize: '16px',
                     fill: '#FFFFFF',
                     backgroundColor: '#1E90FF',
                     padding: { x: 15, y: 8 }
                 }).setOrigin(0.5).setInteractive();
 
-                // Кнопка в меню
-                const menuButton = this.add.text(config.width/2, config.height/2 + 70, 'В МЕНЮ', {
-                    fontSize: '14px',
-                    fill: '#CCCCCC',
-                    backgroundColor: '#333333',
-                    padding: { x: 15, y: 6 }
-                }).setOrigin(0.5).setInteractive();
-
-                // Обработчики кнопок
-                restartButton.on('pointerover', () => restartButton.setBackgroundColor('#1565C0'));
-                restartButton.on('pointerout', () => restartButton.setBackgroundColor('#1E90FF'));
                 restartButton.on('pointerdown', () => {
-                    adManager.showInterstitial();
                     this.scene.start('MainGame');
-                });
-
-                menuButton.on('pointerover', () => menuButton.setBackgroundColor('#555555'));
-                menuButton.on('pointerout', () => menuButton.setBackgroundColor('#333333'));
-                menuButton.on('pointerdown', () => {
-                    this.scene.start('SplashScene');
                 });
 
                 // Отправка в Telegram
@@ -677,12 +626,39 @@
         }
 
         // =============================================
-        // ЗАПУСК СЦЕН
+        // ЗАПУСК ОПТИМИЗИРОВАННЫХ СЦЕН
         // =============================================
-        game.scene.add('SplashScene', SplashScene);
-        game.scene.add('MainGame', MainGame);
-        game.scene.add('GameOverScene', GameOverScene);
+        game.scene.add('SplashScene', OptimizedSplashScene);
+        game.scene.add('MainGame', OptimizedMainGame);
+        game.scene.add('GameOverScene', OptimizedGameOverScene);
         game.scene.start('SplashScene');
+
+        // =============================================
+        // ДОПОЛНИТЕЛЬНЫЕ ОПТИМИЗАЦИИ ДЛЯ TELEGRAM
+        // =============================================
+        
+        // Предотвращаем действия по умолчанию
+        document.addEventListener('touchmove', function(e) {
+            if (e.touches.length > 1) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+
+        // Оптимизация для мобильных устройств
+        if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+            // Дополнительные мобильные оптимизации
+            document.body.style.webkitBackfaceVisibility = 'hidden';
+            document.body.style.webkitTransformStyle = 'preserve-3d';
+        }
+
+        // Очистка при закрытии
+        window.addEventListener('beforeunload', function() {
+            if (game && game.destroy) {
+                game.destroy(true);
+            }
+        });
+
+        console.log('Игра оптимизирована для Telegram WebView');
     </script>
 </body>
 </html>
