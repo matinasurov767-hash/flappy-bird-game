@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Flappy Bird by Matin</title>
     
-    <!-- PWA манифест -->
+    <!-- ДОБАВЛЕНЫ СТРОКИ ДЛЯ PWA -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1E90FF">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -23,286 +23,23 @@
             align-items: center;
             height: 100vh;
             overflow: hidden;
-            font-family: 'Arial', sans-serif;
-            -webkit-tap-highlight-color: transparent;
-            -webkit-touch-callout: none;
-            -webkit-user-select: none;
-            user-select: none;
         }
         #game-container {
             max-width: 100%;
             max-height: 100%;
-            position: relative;
-        }
-        #ad-container {
-            position: absolute;
-            bottom: 10px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(255, 107, 107, 0.9);
-            color: white;
-            padding: 8px 16px;
-            border-radius: 15px;
-            font-size: 12px;
-            z-index: 1000;
-            display: none;
-        }
-        #sound-toggle {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: rgba(0,0,0,0.5);
-            color: white;
-            border: none;
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            font-size: 16px;
-            cursor: pointer;
-            z-index: 1000;
-        }
-        #performance-warning {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.8);
-            color: white;
-            padding: 20px;
-            border-radius: 10px;
-            text-align: center;
-            display: none;
-            z-index: 2000;
-        }
-        #fps-counter {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            color: white;
-            font-size: 12px;
-            background: rgba(0,0,0,0.5);
-            padding: 5px;
-            border-radius: 5px;
-            display: none;
         }
     </style>
 </head>
 <body>
     <div id="game-container"></div>
-    <div id="ad-container">Реклама · Поддержите разработчика</div>
-    <button id="sound-toggle">🔊</button>
-    <div id="performance-warning">
-        <h3>Оптимизация производительности</h3>
-        <p>Игра оптимизируется для плавной работы...</p>
-    </div>
-    <div id="fps-counter">FPS: 60</div>
-    
     <script>
-        // =============================================
-        // ОПТИМИЗАЦИЯ ДЛЯ TELEGRAM WEBVIEW
-        // =============================================
-        
-        // Отключаем ненужные функции для улучшения производительности
-        if (window.Telegram?.WebApp) {
-            // Оптимизации для Telegram WebView
-            document.addEventListener('DOMContentLoaded', function() {
-                // Предотвращаем зум при двойном тапе
-                document.addEventListener('touchstart', function(e) {
-                    if (e.touches.length > 1) e.preventDefault();
-                }, { passive: false });
-                
-                // Предотвращаем выделение текста
-                document.addEventListener('selectstart', function(e) {
-                    e.preventDefault();
-                });
-            });
-        }
-
-        // =============================================
-        // МОНИТОРИНГ ПРОИЗВОДИТЕЛЬНОСТИ
-        // =============================================
-        class PerformanceMonitor {
-            constructor() {
-                this.fps = 60;
-                this.lastTime = performance.now();
-                this.frameCount = 0;
-                this.fpsCounter = document.getElementById('fps-counter');
-                this.warningElement = document.getElementById('performance-warning');
-                this.lowFpsCount = 0;
-                
-                // Для отладки можно включить показ FPS
-                // this.fpsCounter.style.display = 'block';
-            }
-            
-            update() {
-                this.frameCount++;
-                const currentTime = performance.now();
-                
-                if (currentTime >= this.lastTime + 1000) {
-                    this.fps = Math.round((this.frameCount * 1000) / (currentTime - this.lastTime));
-                    this.lastTime = currentTime;
-                    this.frameCount = 0;
-                    
-                    this.fpsCounter.textContent = `FPS: ${this.fps}`;
-                    
-                    // Проверяем на низкий FPS
-                    if (this.fps < 30) {
-                        this.lowFpsCount++;
-                        if (this.lowFpsCount > 5) {
-                            this.showWarning();
-                        }
-                    } else {
-                        this.lowFpsCount = 0;
-                        this.hideWarning();
-                    }
-                }
-            }
-            
-            showWarning() {
-                this.warningElement.style.display = 'block';
-                setTimeout(() => {
-                    this.hideWarning();
-                }, 2000);
-            }
-            
-            hideWarning() {
-                this.warningElement.style.display = 'none';
-            }
-        }
-
-        const performanceMonitor = new PerformanceMonitor();
-
-        // =============================================
-        // ИНТЕГРАЦИЯ С TELEGRAM С ОПТИМИЗАЦИЕЙ
-        // =============================================
+        // Интеграция с Telegram Web App
         let tg = window.Telegram?.WebApp;
         if (tg) {
-            // Оптимизации для Telegram
             tg.ready();
             tg.expand();
-            
-            // Отключаем некоторые функции для улучшения производительности
-            setTimeout(() => {
-                if (tg.isExpanded) {
-                    // Дополнительные оптимизации после раскрытия
-                }
-            }, 1000);
         }
 
-        // =============================================
-        // ОПТИМИЗИРОВАННЫЙ МЕНЕДЖЕР РЕКЛАМЫ
-        // =============================================
-        class AdManager {
-            constructor() {
-                this.adInterval = 3;
-                this.gamesPlayed = 0;
-                this.adContainer = document.getElementById('ad-container');
-            }
-
-            showInterstitial() {
-                this.gamesPlayed++;
-                if (this.gamesPlayed >= this.adInterval) {
-                    this.gamesPlayed = 0;
-                    // Откладываем показ рекламы для избежания лагов
-                    setTimeout(() => this.showAd(), 100);
-                }
-            }
-
-            showAd() {
-                this.adContainer.style.display = 'block';
-                this.adContainer.textContent = 'Реклама · Поддержите разработчика Matin';
-                
-                setTimeout(() => {
-                    this.adContainer.style.display = 'none';
-                }, 5000);
-            }
-        }
-
-        const adManager = new AdManager();
-
-        // =============================================
-        // ОПТИМИЗИРОВАННЫЙ МЕНЕДЖЕР ЗВУКА
-        // =============================================
-        class OptimizedSoundManager {
-            constructor() {
-                this.sounds = {};
-                this.muted = true; // Начинаем с выключенного звука для производительности
-                this.soundToggle = document.getElementById('sound-toggle');
-                this.audioContext = null;
-                this.audioUnlocked = false;
-                
-                this.soundToggle.addEventListener('click', () => {
-                    this.toggleMute();
-                });
-
-                // В Telegram WebView звук может вызывать лаги, поэтому начинаем с выключенного
-                this.soundToggle.textContent = '🔇';
-            }
-
-            addSound(key, config) {
-                this.sounds[key] = config;
-            }
-
-            playSound(key, volume = 1) {
-                if (this.muted || !this.audioUnlocked) return;
-                
-                const sound = this.sounds[key];
-                if (sound && sound.audio) {
-                    try {
-                        const audio = new Audio();
-                        audio.src = sound.audio;
-                        audio.volume = volume * (sound.volume || 1);
-                        
-                        // Предзагрузка для уменьшения лагов
-                        audio.preload = 'auto';
-                        
-                        const playPromise = audio.play();
-                        if (playPromise !== undefined) {
-                            playPromise.catch(() => {
-                                // Игнорируем ошибки воспроизведения для производительности
-                            });
-                        }
-                    } catch (e) {
-                        // Игнорируем ошибки для стабильности
-                    }
-                }
-            }
-
-            toggleMute() {
-                this.muted = !this.muted;
-                this.soundToggle.textContent = this.muted ? '🔇' : '🔊';
-                
-                if (!this.muted && !this.audioUnlocked) {
-                    this.unlockAudio();
-                }
-            }
-
-            unlockAudio() {
-                this.audioUnlocked = true;
-                // Воспроизводим тихий звук для разблокировки аудио
-                try {
-                    const audio = new Audio();
-                    audio.volume = 0.01;
-                    audio.play().then(() => {
-                        audio.pause();
-                    }).catch(() => {});
-                } catch (e) {
-                    // Игнорируем ошибки
-                }
-            }
-        }
-
-        const soundManager = new OptimizedSoundManager();
-
-        // Добавляем звуки
-        soundManager.addSound('flap', { audio: 'sounds/flap.wav', volume: 0.3 });
-        soundManager.addSound('score', { audio: 'sounds/score.wav', volume: 0.5 });
-        soundManager.addSound('hit', { audio: 'sounds/hit.wav', volume: 0.7 });
-        soundManager.addSound('background', { audio: 'sounds/background.mp3', volume: 0.2 });
-
-        // =============================================
-        // ОПТИМИЗИРОВАННАЯ КОНФИГУРАЦИЯ PHASER
-        // =============================================
         const config = {
             type: Phaser.AUTO,
             parent: 'game-container',
@@ -312,353 +49,156 @@
                 default: 'arcade', 
                 arcade: { 
                     gravity: { y: 800 },
-                    debug: false,
-                    // Оптимизации физики
-                    fps: 60,
-                    timeScale: 1,
-                    fixedStep: true
+                    debug: false
                 } 
             },
-            // Оптимизации рендеринга
-            render: {
-                antialias: false,
-                pixelArt: false,
-                roundPixels: true // Уменьшает дрожание
+            scene: {
+                preload: preload,
+                create: create,
+                update: update
             },
             scale: {
                 mode: Phaser.Scale.FIT,
                 autoCenter: Phaser.Scale.CENTER_BOTH
-            },
-            // Оптимизации сцен
-            scene: {
-                preload: function() {},
-                create: function() {}, 
-                update: function() {}
-            },
-            // Дополнительные оптимизации
-            fps: {
-                target: 60,
-                forceSetTimeOut: false // Лучше для производительности
-            },
-            backgroundColor: '#000000'
+            }
         };
 
         const game = new Phaser.Game(config);
+        let bird, pipes, score = 0, scoreText, gameOver = false;
+        let spaceKey, flapVelocity = -350;
+        let pipeInterval = 1500;
 
-        // =============================================
-        // ОПТИМИЗИРОВАННАЯ СЦЕНА ЗАСТАВКИ
-        // =============================================
-        class OptimizedSplashScene extends Phaser.Scene {
-            constructor() {
-                super({ key: 'SplashScene' });
+        function preload() {
+            this.load.image('bird', 'assets/bird.png');
+            this.load.image('pipe', 'assets/pipe.png');
+            this.load.image('background', 'assets/background.png');
+        }
+
+        function create() {
+            // Фон
+            this.add.image(config.width/2, config.height/2, 'background')
+                .setDisplaySize(config.width, config.height);
+
+            // Птица
+            bird = this.physics.add.sprite(80, config.height/2, 'bird');
+            bird.setCollideWorldBounds(true);
+            
+            // Группа труб
+            pipes = this.physics.add.group();
+            
+            // Коллайдер
+            this.physics.add.collider(bird, pipes, hitPipe, null, this);
+            
+            // Счет
+            scoreText = this.add.text(20, 20, 'Счёт: 0', { 
+                fontSize: '24px', 
+                fill: '#FFF',
+                fontFamily: 'Arial',
+                stroke: '#000',
+                strokeThickness: 4
+            });
+            
+            // Управление
+            this.input.on('pointerdown', flap);
+            spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+            spaceKey.on('down', flap);
+            
+            // Генерация труб
+            this.time.addEvent({ 
+                delay: pipeInterval, 
+                callback: addPipe, 
+                callbackScope: this, 
+                loop: true 
+            });
+        }
+
+        function update() {
+            if (gameOver) return;
+            
+            // Поворот птицы в зависимости от скорости
+            if (bird.body.velocity.y < 0) {
+                bird.rotation = -0.3;
+            } else {
+                bird.rotation = Phaser.Math.Clamp(bird.body.velocity.y / 400, -0.3, 0.5);
             }
-
-            preload() {
-                // Загружаем ассеты с оптимизацией
-                this.load.image('bird', 'assets/bird.png');
-                this.load.image('pipe', 'assets/pipe.png');
-                this.load.image('background', 'assets/background.png');
+            
+            // Конец игры если упала или улетела вверх
+            if (bird.y > config.height - 10 || bird.y < -10) {
+                endGame();
             }
+            
+            // Обновление счета
+            pipes.children.iterate(pipe => {
+                if (!pipe.passed && pipe.x < bird.x - 10 && pipe.texture.key === 'pipe') {
+                    pipe.passed = true;
+                    score += 0.5;
+                    scoreText.setText('Счёт: ' + Math.floor(score));
+                }
+            });
+        }
 
-            create() {
-                // Простой фон без сложной графики
-                this.cameras.main.setBackgroundColor(0x1a1a2e);
+        function flap() {
+            if (gameOver) {
+                // Рестарт игры
+                score = 0;
+                gameOver = false;
+                bird.setTint(0xFFFFFF);
+                bird.setVelocityY(0);
+                bird.y = config.height/2;
+                bird.rotation = 0;
+                pipes.clear(true, true);
+                scoreText.setText('Счёт: 0');
+                return;
+            }
+            
+            bird.setVelocityY(flapVelocity);
+        }
 
-                // Минималистичный текст
-                const title = this.add.text(config.width/2, 200, 'FLAPPY BIRD', {
-                    fontSize: '32px',
-                    fill: '#FFD700'
-                }).setOrigin(0.5);
+        function addPipe() {
+            if (gameOver) return;
+            
+            const gap = 180;
+            const holePosition = Phaser.Math.Between(120, config.height - 120);
+            
+            // Верхняя труба
+            const topPipe = pipes.create(config.width, holePosition - gap/2, 'pipe');
+            topPipe.setOrigin(0.5, 1);
+            topPipe.setImmovable(true);
+            topPipe.body.allowGravity = false;
+            topPipe.setVelocityX(-200);
+            
+            // Нижняя труба  
+            const bottomPipe = pipes.create(config.width, holePosition + gap/2, 'pipe');
+            bottomPipe.setOrigin(0.5, 0);
+            bottomPipe.setImmovable(true);
+            bottomPipe.body.allowGravity = false;
+            bottomPipe.setVelocityX(-200);
+        }
 
-                const startButton = this.add.text(config.width/2, 350, 'НАЧАТЬ ИГРУ', {
-                    fontSize: '20px',
-                    fill: '#FFFFFF',
-                    backgroundColor: '#1E90FF',
-                    padding: { x: 20, y: 10 }
-                }).setOrigin(0.5).setInteractive();
-
-                startButton.on('pointerdown', () => {
-                    this.scene.start('MainGame');
-                });
-
-                // Быстрый переход
-                this.time.delayedCall(2000, () => {
-                    this.scene.start('MainGame');
-                });
+        function hitPipe() {
+            if (!gameOver) {
+                endGame();
             }
         }
 
-        // =============================================
-        // ОПТИМИЗИРОВАННАЯ ОСНОВНАЯ ИГРА
-        // =============================================
-        class OptimizedMainGame extends Phaser.Scene {
-            constructor() {
-                super({ key: 'MainGame' });
-                this.pipesToRemove = [];
-            }
-
-            init() {
-                this.score = 0;
-                this.gameOver = false;
-                this.pipeTimer = null;
-                this.lastPipeTime = 0;
-                this.pipeCount = 0;
-                this.maxPipes = 6; // Ограничиваем количество труб
-            }
-
-            create() {
-                // Фон
-                this.background = this.add.image(config.width/2, config.height/2, 'background')
-                    .setDisplaySize(config.width, config.height);
-
-                // Птица
-                this.bird = this.physics.add.sprite(80, config.height/2, 'bird');
-                this.bird.setCollideWorldBounds(true);
-                
-                // Трубы
-                this.pipes = this.physics.add.group();
-                
-                // Упрощенный коллайдер
-                this.physics.add.collider(this.bird, this.pipes, this.hitPipe, null, this);
-                
-                // Счет
-                this.scoreText = this.add.text(20, 20, '0', { 
-                    fontSize: '20px', 
-                    fill: '#FFF'
-                });
-
-                // Управление
-                this.input.on('pointerdown', this.flap, this);
-                
-                // Оптимизированная генерация труб
-                this.pipeTimer = this.time.addEvent({ 
-                    delay: 1500, 
-                    callback: this.addPipe, 
-                    callbackScope: this, 
-                    loop: true 
-                });
-
-                // Запускаем мониторинг производительности
-                this.performanceCheck = this.time.addEvent({
-                    delay: 1000,
-                    callback: this.performanceOptimization,
-                    callbackScope: this,
-                    loop: true
-                });
-            }
-
-            update(time, delta) {
-                performanceMonitor.update();
-                
-                if (this.gameOver) return;
-                
-                // Упрощенная логика поворота птицы
-                if (this.bird.body.velocity.y < 0) {
-                    this.bird.rotation = -0.3;
-                } else {
-                    this.bird.rotation = Math.min(this.bird.body.velocity.y / 400, 0.5);
-                }
-                
-                // Конец игры
-                if (this.bird.y > config.height - 10 || this.bird.y < -10) {
-                    this.endGame();
-                }
-                
-                // Оптимизированное обновление счета и удаление труб
-                let scoreChanged = false;
-                this.pipes.children.iterate(pipe => {
-                    // Удаляем трубы, которые вышли за экран
-                    if (pipe.x < -100) {
-                        this.pipes.remove(pipe, true, true);
-                        this.pipeCount--;
-                        return;
-                    }
-
-                    if (!pipe.passed && pipe.x < this.bird.x - 10) {
-                        pipe.passed = true;
-                        this.score += 0.5;
-                        scoreChanged = true;
-                        soundManager.playSound('score');
-                    }
-                });
-
-                if (scoreChanged) {
-                    this.scoreText.setText(Math.floor(this.score));
-                }
-            }
-
-            flap() {
-                if (this.gameOver) return;
-                this.bird.setVelocityY(-350);
-                soundManager.playSound('flap');
-            }
-
-            addPipe() {
-                if (this.gameOver || this.pipeCount >= this.maxPipes) return;
-                
-                const gap = 180;
-                const holePosition = Phaser.Math.Between(120, config.height - 120);
-                
-                // Верхняя труба
-                const topPipe = this.pipes.create(config.width, holePosition - gap/2, 'pipe');
-                topPipe.setOrigin(0.5, 1);
-                topPipe.setImmovable(true);
-                topPipe.body.allowGravity = false;
-                topPipe.setVelocityX(-200);
-                
-                // Нижняя труба  
-                const bottomPipe = this.pipes.create(config.width, holePosition + gap/2, 'pipe');
-                bottomPipe.setOrigin(0.5, 0);
-                bottomPipe.setImmovable(true);
-                bottomPipe.body.allowGravity = false;
-                bottomPipe.setVelocityX(-200);
-                
-                this.pipeCount += 2;
-            }
-
-            performanceOptimization() {
-                // Автоматическая оптимизация при низком FPS
-                if (performanceMonitor.fps < 30) {
-                    // Уменьшаем количество частиц, эффектов
-                    if (this.pipeTimer) {
-                        this.pipeTimer.delay = Math.max(2000, this.pipeTimer.delay + 100);
-                    }
-                } else if (performanceMonitor.fps > 50) {
-                    // Возвращаем нормальную скорость
-                    if (this.pipeTimer) {
-                        this.pipeTimer.delay = Math.min(1500, this.pipeTimer.delay - 100);
-                    }
-                }
-            }
-
-            hitPipe() {
-                if (!this.gameOver) {
-                    this.endGame();
-                }
-            }
-
-            endGame() {
-                if (this.gameOver) return;
-                
-                this.gameOver = true;
-                this.bird.setTint(0xFF0000);
-                
-                // Останавливаем таймеры
-                if (this.pipeTimer) this.pipeTimer.remove();
-                if (this.performanceCheck) this.performanceCheck.remove();
-                
-                // Останавливаем трубы
-                this.pipes.children.iterate(pipe => {
-                    pipe.setVelocityX(0);
-                });
-                
-                soundManager.playSound('hit');
-                
-                // Сохраняем рекорд
-                const finalScore = Math.floor(this.score);
-                const bestScore = localStorage.getItem('flappyBestScore') || 0;
-                if (finalScore > bestScore) {
-                    localStorage.setItem('flappyBestScore', finalScore);
-                }
-                
-                // Быстрый переход
-                this.time.delayedCall(800, () => {
-                    this.scene.start('GameOverScene', { 
-                        score: finalScore,
-                        bestScore: Math.max(finalScore, bestScore)
-                    });
-                });
-            }
-
-            shutdown() {
-                // Тщательная очистка
-                if (this.pipeTimer) this.pipeTimer.remove();
-                if (this.performanceCheck) this.performanceCheck.remove();
-                this.pipes.clear(true, true);
-                this.input.off('pointerdown', this.flap, this);
+        function endGame() {
+            gameOver = true;
+            bird.setTint(0xFF0000);
+            bird.setVelocityY(-200);
+            
+            // Финал счета
+            scoreText.setText('Игра окончена!\nСчёт: ' + Math.floor(score) + '\nТапни для рестарта');
+            scoreText.setPosition(config.width/2, config.height/2);
+            scoreText.setOrigin(0.5);
+            
+            // Отправка счета в Telegram
+            if (tg) {
+                tg.sendData(JSON.stringify({ 
+                    action: 'game_over',
+                    score: Math.floor(score)
+                }));
             }
         }
-
-        // =============================================
-        // ОПТИМИЗИРОВАННАЯ СЦЕНА КОНЦА ИГРЫ
-        // =============================================
-        class OptimizedGameOverScene extends Phaser.Scene {
-            constructor() {
-                super({ key: 'GameOverScene' });
-            }
-
-            init(data) {
-                this.score = data.score;
-                this.bestScore = data.bestScore;
-            }
-
-            create() {
-                // Простой интерфейс
-                this.add.text(config.width/2, config.height/2 - 50, 'ИГРА ОКОНЧЕНА', {
-                    fontSize: '20px',
-                    fill: '#FF6B6B'
-                }).setOrigin(0.5);
-
-                this.add.text(config.width/2, config.height/2, `Счёт: ${this.score}`, {
-                    fontSize: '24px',
-                    fill: '#FFD700'
-                }).setOrigin(0.5);
-
-                const restartButton = this.add.text(config.width/2, config.height/2 + 50, 'ИГРАТЬ СНОВА', {
-                    fontSize: '16px',
-                    fill: '#FFFFFF',
-                    backgroundColor: '#1E90FF',
-                    padding: { x: 15, y: 8 }
-                }).setOrigin(0.5).setInteractive();
-
-                restartButton.on('pointerdown', () => {
-                    this.scene.start('MainGame');
-                });
-
-                // Отправка в Telegram
-                if (tg) {
-                    tg.sendData(JSON.stringify({ 
-                        action: 'game_over',
-                        score: this.score
-                    }));
-                }
-            }
-        }
-
-        // =============================================
-        // ЗАПУСК ОПТИМИЗИРОВАННЫХ СЦЕН
-        // =============================================
-        game.scene.add('SplashScene', OptimizedSplashScene);
-        game.scene.add('MainGame', OptimizedMainGame);
-        game.scene.add('GameOverScene', OptimizedGameOverScene);
-        game.scene.start('SplashScene');
-
-        // =============================================
-        // ДОПОЛНИТЕЛЬНЫЕ ОПТИМИЗАЦИИ ДЛЯ TELEGRAM
-        // =============================================
-        
-        // Предотвращаем действия по умолчанию
-        document.addEventListener('touchmove', function(e) {
-            if (e.touches.length > 1) {
-                e.preventDefault();
-            }
-        }, { passive: false });
-
-        // Оптимизация для мобильных устройств
-        if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-            // Дополнительные мобильные оптимизации
-            document.body.style.webkitBackfaceVisibility = 'hidden';
-            document.body.style.webkitTransformStyle = 'preserve-3d';
-        }
-
-        // Очистка при закрытии
-        window.addEventListener('beforeunload', function() {
-            if (game && game.destroy) {
-                game.destroy(true);
-            }
-        });
-
-        console.log('Игра оптимизирована для Telegram WebView');
     </script>
 </body>
 </html>
