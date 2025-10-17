@@ -207,6 +207,107 @@
         const soundManager = new SoundManager();
 
         // =============================================
+        // МЕНЕДЖЕР ОНЛАЙН ТАБЛИЦЫ ЛИДЕРОВ
+        // =============================================
+        class OnlineLeaderboardManager {
+            constructor() {
+                this.apiUrl = 'https://your-backend-url.com/api'; // Замените на ваш URL
+                this.leaderboard = [];
+                this.userRank = 0;
+            }
+
+            async submitScore(score, userData) {
+                try {
+                    if (!tg || !tg.initDataUnsafe.user) {
+                        console.log('Telegram user data not available');
+                        return;
+                    }
+
+                    const response = await fetch(`${this.apiUrl}/leaderboard`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            score: score,
+                            user_id: tg.initDataUnsafe.user.id,
+                            first_name: tg.initDataUnsafe.user.first_name,
+                            last_name: tg.initDataUnsafe.user.last_name || '',
+                            username: tg.initDataUnsafe.user.username || '',
+                            difficulty: userData.difficulty
+                        })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Failed to submit score');
+                    }
+
+                    return await response.json();
+                } catch (error) {
+                    console.error('Error submitting score:', error);
+                    // Fallback to localStorage
+                    this.submitScoreToLocalStorage(score, userData);
+                }
+            }
+
+            async getLeaderboard() {
+                try {
+                    const response = await fetch(`${this.apiUrl}/leaderboard`);
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch leaderboard');
+                    }
+                    
+                    const data = await response.json();
+                    this.leaderboard = data.leaderboard || [];
+                    this.userRank = data.userRank || 0;
+                    
+                    return this.leaderboard;
+                } catch (error) {
+                    console.error('Error fetching leaderboard:', error);
+                    // Fallback to localStorage
+                    return this.getLocalLeaderboard();
+                }
+            }
+
+            // Fallback методы для локального хранения
+            submitScoreToLocalStorage(score, userData) {
+                const leaderboard = JSON.parse(localStorage.getItem('onlineLeaderboard') || '[]');
+                const user = tg?.initDataUnsafe?.user;
+                
+                const entry = {
+                    score: score,
+                    user_id: user?.id || 'anonymous',
+                    first_name: user?.first_name || 'Игрок',
+                    last_name: user?.last_name || '',
+                    username: user?.username || '',
+                    difficulty: userData.difficulty,
+                    timestamp: Date.now()
+                };
+
+                leaderboard.push(entry);
+                
+                // Сортируем по убыванию счета и оставляем топ-50
+                leaderboard.sort((a, b) => b.score - a.score);
+                const topScores = leaderboard.slice(0, 50);
+                
+                localStorage.setItem('onlineLeaderboard', JSON.stringify(topScores));
+            }
+
+            getLocalLeaderboard() {
+                const leaderboard = JSON.parse(localStorage.getItem('onlineLeaderboard') || '[]');
+                // Сортируем на случай, если данные были добавлены вручную
+                leaderboard.sort((a, b) => b.score - a.score);
+                return leaderboard.slice(0, 10); // Возвращаем топ-10
+            }
+
+            getUserRank() {
+                return this.userRank;
+            }
+        }
+
+        const onlineLeaderboard = new OnlineLeaderboardManager();
+
+        // =============================================
         // МЕНЕДЖЕР СТАТИСТИКИ
         // =============================================
         class StatsManager {
@@ -401,8 +502,8 @@
                     this.startGame(selectedDifficulty);
                 });
 
-                // Кнопка таблицы лидеров
-                const leaderboardButton = this.add.text(config.width/2, 520, 'ТАБЛИЦА ЛИДЕРОВ', {
+                // Кнопка онлайн таблицы лидеров
+                const leaderboardButton = this.add.text(config.width/2, 520, 'ОНЛАЙН ТАБЛИЦА', {
                     fontSize: '16px',
                     fill: '#FFFFFF',
                     backgroundColor: '#1E90FF',
@@ -418,7 +519,7 @@
                 });
 
                 leaderboardButton.on('pointerdown', () => {
-                    this.scene.start('LeaderboardScene');
+                    this.scene.start('OnlineLeaderboardScene');
                 });
 
                 // Автопереход через 10 секунд
@@ -584,6 +685,11 @@
                 const isNewRecord = statsManager.setBestScore(finalScore);
                 statsManager.addToTotalScore(finalScore);
                 
+                // Отправляем результат в онлайн таблицу лидеров
+                onlineLeaderboard.submitScore(finalScore, {
+                    difficulty: this.difficulty
+                });
+                
                 // Задержка перед переходом на сцену окончания
                 this.time.delayedCall(1000, () => {
                     this.scene.start('GameOverScene', { 
@@ -663,8 +769,8 @@
                     padding: { x: 15, y: 8 }
                 }).setOrigin(0.5).setInteractive();
 
-                // Кнопка таблицы лидеров
-                const leaderboardButton = this.add.text(config.width/2, config.height/2 + 90, 'ТАБЛИЦА ЛИДЕРОВ', {
+                // Кнопка онлайн таблицы лидеров
+                const leaderboardButton = this.add.text(config.width/2, config.height/2 + 90, 'ОНЛАЙН ТАБЛИЦА', {
                     fontSize: '16px',
                     fill: '#FFFFFF',
                     backgroundColor: '#1E90FF',
@@ -690,7 +796,7 @@
                 leaderboardButton.on('pointerover', () => leaderboardButton.setBackgroundColor('#1565C0'));
                 leaderboardButton.on('pointerout', () => leaderboardButton.setBackgroundColor('#1E90FF'));
                 leaderboardButton.on('pointerdown', () => {
-                    this.scene.start('LeaderboardScene');
+                    this.scene.start('OnlineLeaderboardScene');
                 });
 
                 menuButton.on('pointerover', () => menuButton.setBackgroundColor('#555555'));
@@ -712,11 +818,11 @@
         }
 
         // =============================================
-        // СЦЕНА ТАБЛИЦЫ ЛИДЕРОВ
+        // СЦЕНА ОНЛАЙН ТАБЛИЦЫ ЛИДЕРОВ
         // =============================================
-        class LeaderboardScene extends Phaser.Scene {
+        class OnlineLeaderboardScene extends Phaser.Scene {
             constructor() {
-                super({ key: 'LeaderboardScene' });
+                super({ key: 'OnlineLeaderboardScene' });
             }
 
             create() {
@@ -724,55 +830,38 @@
                 this.cameras.main.setBackgroundColor(0x1a1a2e);
 
                 // Заголовок
-                this.add.text(config.width/2, 80, 'ТАБЛИЦА ЛИДЕРОВ', {
-                    fontSize: '28px',
+                this.add.text(config.width/2, 60, 'ОНЛАЙН ТАБЛИЦА ЛИДЕРОВ', {
+                    fontSize: '22px',
                     fill: '#FFD700',
                     fontStyle: 'bold'
                 }).setOrigin(0.5);
 
-                // Получаем статистику
-                const bestScore = statsManager.getBestScore();
-                const gamesPlayed = statsManager.getGamesPlayed();
-                const totalScore = statsManager.getTotalScore();
-                const averageScore = statsManager.getAverageScore();
-                
-                // Статистика
-                this.add.text(config.width/2, 140, `Ваш рекорд: ${bestScore}`, {
-                    fontSize: '20px',
-                    fill: '#1E90FF'
-                }).setOrigin(0.5);
-
-                this.add.text(config.width/2, 170, `Всего игр: ${gamesPlayed}`, {
-                    fontSize: '16px',
+                // Индикатор загрузки
+                const loadingText = this.add.text(config.width/2, config.height/2, 'Загрузка...', {
+                    fontSize: '18px',
                     fill: '#FFFFFF'
                 }).setOrigin(0.5);
 
-                this.add.text(config.width/2, 200, `Средний счёт: ${averageScore}`, {
-                    fontSize: '16px',
-                    fill: '#FFFFFF'
-                }).setOrigin(0.5);
+                // Загружаем таблицу лидеров
+                onlineLeaderboard.getLeaderboard().then(leaderboard => {
+                    loadingText.destroy();
+                    this.displayLeaderboard(leaderboard);
+                }).catch(error => {
+                    loadingText.setText('Ошибка загрузки');
+                    console.error('Error loading leaderboard:', error);
+                });
 
-                this.add.text(config.width/2, 230, `Всего очков: ${totalScore}`, {
-                    fontSize: '16px',
-                    fill: '#FFFFFF'
-                }).setOrigin(0.5);
+                // Кнопка обновления
+                const refreshButton = this.add.text(config.width - 30, 30, '🔄', {
+                    fontSize: '20px'
+                }).setOrigin(0.5).setInteractive();
 
-                // Достижения
-                const achievements = statsManager.getAchievements(bestScore);
-                this.add.text(config.width/2, 270, 'ДОСТИЖЕНИЯ:', {
-                    fontSize: '16px',
-                    fill: '#FFD700'
-                }).setOrigin(0.5);
-
-                achievements.forEach((achievement, index) => {
-                    this.add.text(config.width/2, 300 + index * 25, `✓ ${achievement}`, {
-                        fontSize: '14px',
-                        fill: '#90EE90'
-                    }).setOrigin(0.5);
+                refreshButton.on('pointerdown', () => {
+                    this.scene.restart();
                 });
 
                 // Кнопка назад
-                const backButton = this.add.text(config.width/2, 450, 'НАЗАД', {
+                const backButton = this.add.text(config.width/2, 580, 'НАЗАД', {
                     fontSize: '18px',
                     fill: '#FFFFFF',
                     backgroundColor: '#1E90FF',
@@ -791,6 +880,92 @@
                     this.scene.start('SplashScene');
                 });
             }
+
+            displayLeaderboard(leaderboard) {
+                if (leaderboard.length === 0) {
+                    this.add.text(config.width/2, config.height/2, 'Нет данных', {
+                        fontSize: '18px',
+                        fill: '#FFFFFF'
+                    }).setOrigin(0.5);
+                    return;
+                }
+
+                // Заголовки столбцов
+                this.add.text(30, 100, 'Место', {
+                    fontSize: '14px',
+                    fill: '#FFD700',
+                    fontStyle: 'bold'
+                });
+
+                this.add.text(100, 100, 'Игрок', {
+                    fontSize: '14px',
+                    fill: '#FFD700',
+                    fontStyle: 'bold'
+                });
+
+                this.add.text(280, 100, 'Очки', {
+                    fontSize: '14px',
+                    fill: '#FFD700',
+                    fontStyle: 'bold'
+                });
+
+                // Список лидеров
+                leaderboard.forEach((entry, index) => {
+                    const y = 130 + index * 30;
+                    
+                    // Место
+                    let medal = '';
+                    let medalColor = '#FFFFFF';
+                    
+                    if (index === 0) {
+                        medal = '🥇';
+                        medalColor = '#FFD700';
+                    } else if (index === 1) {
+                        medal = '🥈';
+                        medalColor = '#C0C0C0';
+                    } else if (index === 2) {
+                        medal = '🥉';
+                        medalColor = '#CD7F32';
+                    }
+                    
+                    this.add.text(30, y, `${medal} ${index + 1}`, {
+                        fontSize: '14px',
+                        fill: medalColor
+                    });
+
+                    // Имя игрока
+                    let playerName = entry.first_name || 'Игрок';
+                    if (entry.last_name) {
+                        playerName += ' ' + entry.last_name;
+                    }
+                    if (playerName.length > 15) {
+                        playerName = playerName.substring(0, 15) + '...';
+                    }
+
+                    // Подсветка текущего пользователя
+                    const isCurrentUser = tg && tg.initDataUnsafe.user && 
+                                         entry.user_id === tg.initDataUnsafe.user.id;
+                    
+                    this.add.text(100, y, playerName, {
+                        fontSize: '14px',
+                        fill: isCurrentUser ? '#1E90FF' : '#FFFFFF',
+                        fontStyle: isCurrentUser ? 'bold' : 'normal'
+                    });
+
+                    // Очки
+                    this.add.text(280, y, entry.score.toString(), {
+                        fontSize: '14px',
+                        fill: isCurrentUser ? '#1E90FF' : '#FFFFFF',
+                        fontStyle: isCurrentUser ? 'bold' : 'normal'
+                    });
+                });
+
+                // Общее количество игроков
+                this.add.text(config.width/2, 550, `Всего игроков: ${leaderboard.length}`, {
+                    fontSize: '14px',
+                    fill: '#CCCCCC'
+                }).setOrigin(0.5);
+            }
         }
 
         // =============================================
@@ -799,7 +974,7 @@
         game.scene.add('SplashScene', SplashScene);
         game.scene.add('MainGame', MainGame);
         game.scene.add('GameOverScene', GameOverScene);
-        game.scene.add('LeaderboardScene', LeaderboardScene);
+        game.scene.add('OnlineLeaderboardScene', OnlineLeaderboardScene);
         game.scene.start('SplashScene');
     </script>
 </body>
