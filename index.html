@@ -262,26 +262,60 @@
                 this.cameras.main.setBackgroundColor(0x1a1a2e);
 
                 // Заголовок
-                const title = this.add.text(config.width/2, 200, 'FLAPPY BIRD', {
+                const title = this.add.text(config.width/2, 150, 'FLAPPY BIRD', {
                     fontSize: '32px',
                     fill: '#FFD700',
                     fontStyle: 'bold'
                 }).setOrigin(0.5);
 
-                const developer = this.add.text(config.width/2, 240, 'by MATIN', {
+                const developer = this.add.text(config.width/2, 190, 'by MATIN', {
                     fontSize: '18px',
                     fill: '#FFFFFF'
                 }).setOrigin(0.5);
 
                 // Лучший счет
                 const bestScore = localStorage.getItem('flappyBestScore') || 0;
-                const bestScoreText = this.add.text(config.width/2, 280, `Рекорд: ${bestScore}`, {
+                const bestScoreText = this.add.text(config.width/2, 230, `Рекорд: ${bestScore}`, {
                     fontSize: '16px',
                     fill: '#CCCCCC'
                 }).setOrigin(0.5);
 
+                // Выбор сложности
+                const difficulties = ['easy', 'medium', 'hard'];
+                const difficultyLabels = ['Лёгкий', 'Средний', 'Сложный'];
+                let selectedDifficulty = 'medium'; // По умолчанию
+
+                for (let i = 0; i < difficulties.length; i++) {
+                    const diffButton = this.add.text(config.width/2, 280 + i * 50, difficultyLabels[i], {
+                        fontSize: '20px',
+                        fill: '#FFFFFF',
+                        backgroundColor: difficulties[i] === selectedDifficulty ? '#1565C0' : '#1E90FF',
+                        padding: { x: 20, y: 10 }
+                    }).setOrigin(0.5).setInteractive();
+
+                    diffButton.on('pointerover', () => {
+                        diffButton.setBackgroundColor('#1565C0');
+                    });
+
+                    diffButton.on('pointerout', () => {
+                        diffButton.setBackgroundColor(difficulties[i] === selectedDifficulty ? '#1565C0' : '#1E90FF');
+                    });
+
+                    diffButton.on('pointerdown', () => {
+                        // Сброс стилей предыдущей выбранной
+                        this.children.list.forEach(child => {
+                            if (child.text && difficultyLabels.includes(child.text)) {
+                                const index = difficultyLabels.indexOf(child.text);
+                                child.setBackgroundColor(difficulties[index] === selectedDifficulty ? '#1565C0' : '#1E90FF');
+                            }
+                        });
+                        selectedDifficulty = difficulties[i];
+                        diffButton.setBackgroundColor('#1565C0');
+                    });
+                }
+
                 // Кнопка начала игры
-                const startButton = this.add.text(config.width/2, 350, 'НАЧАТЬ ИГРУ', {
+                const startButton = this.add.text(config.width/2, 450, 'НАЧАТЬ ИГРУ', {
                     fontSize: '20px',
                     fill: '#FFFFFF',
                     backgroundColor: '#1E90FF',
@@ -297,12 +331,12 @@
                 });
 
                 startButton.on('pointerdown', () => {
-                    this.scene.start('MainGame');
+                    this.scene.start('MainGame', { difficulty: selectedDifficulty });
                 });
 
-                // Автопереход через 3 секунды
-                this.time.delayedCall(3000, () => {
-                    this.scene.start('MainGame');
+                // Автопереход через 10 секунд (увеличено для выбора сложности)
+                this.time.delayedCall(10000, () => {
+                    this.scene.start('MainGame', { difficulty: selectedDifficulty });
                 });
             }
         }
@@ -315,11 +349,14 @@
                 super({ key: 'MainGame' });
             }
 
-            init() {
+            init(data) {
                 // Сбрасываем состояние игры при каждом запуске
                 this.score = 0;
                 this.gameOver = false;
                 this.pipeTimer = null;
+                this.difficulty = data.difficulty || 'medium';
+                this.pipeSpeed = this.difficulty === 'easy' ? -150 : this.difficulty === 'hard' ? -250 : -200;
+                this.gap = this.difficulty === 'easy' ? 220 : this.difficulty === 'hard' ? 140 : 180;
             }
 
             create() {
@@ -350,6 +387,12 @@
                 this.bestScoreText = this.add.text(20, 50, 'Рекорд: ' + this.bestScore, { 
                     fontSize: '14px', 
                     fill: '#FFD700'
+                });
+                
+                // Уровень сложности
+                this.difficultyText = this.add.text(20, 80, 'Сложность: ' + (this.difficulty === 'easy' ? 'Лёгкий' : this.difficulty === 'hard' ? 'Сложный' : 'Средний'), { 
+                    fontSize: '14px', 
+                    fill: '#FFFFFF'
                 });
                 
                 // Управление
@@ -402,22 +445,21 @@
             addPipe() {
                 if (this.gameOver) return;
                 
-                const gap = 180;
                 const holePosition = Phaser.Math.Between(120, config.height - 120);
                 
                 // Верхняя труба
-                const topPipe = this.pipes.create(config.width, holePosition - gap/2, 'pipe');
+                const topPipe = this.pipes.create(config.width, holePosition - this.gap/2, 'pipe');
                 topPipe.setOrigin(0.5, 1);
                 topPipe.setImmovable(true);
                 topPipe.body.allowGravity = false;
-                topPipe.setVelocityX(-200);
+                topPipe.setVelocityX(this.pipeSpeed);
                 
                 // Нижняя труба  
-                const bottomPipe = this.pipes.create(config.width, holePosition + gap/2, 'pipe');
+                const bottomPipe = this.pipes.create(config.width, holePosition + this.gap/2, 'pipe');
                 bottomPipe.setOrigin(0.5, 0);
                 bottomPipe.setImmovable(true);
                 bottomPipe.body.allowGravity = false;
-                bottomPipe.setVelocityX(-200);
+                bottomPipe.setVelocityX(this.pipeSpeed);
             }
 
             hitPipe() {
@@ -518,7 +560,20 @@
                     backgroundColor: '#1E90FF',
                     padding: { x: 15, y: 8 }
                 }).setOrigin(0.5).setInteractive();
+const leaderboardButton = this.add.text(config.width/2, 510, 'ТАБЛИЦА ЛИДЕРОВ', {
+    fontSize: '16px',
+    fill: '#FFFFFF',
+    backgroundColor: '#1E90FF',
+    padding: { x: 15, y: 6 }
+}).setOrigin(0.5).setInteractive();
 
+leaderboardButton.on('pointerover', () => leaderboardButton.setBackgroundColor('#1565C0'));
+leaderboardButton.on('pointerout', () => leaderboardButton.setBackgroundColor('#1E90FF'));
+leaderboardButton.on('pointerdown', () => {
+    if (tg) {
+        tg.openLink('https://t.me/your_bot?start=leaderboard');
+    }
+});
                 // Кнопка в меню
                 const menuButton = this.add.text(config.width/2, config.height/2 + 70, 'В МЕНЮ', {
                     fontSize: '14px',
