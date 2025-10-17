@@ -66,10 +66,11 @@
     
     <script>
         // =============================================
-        // ИНТЕГРАЦИЯ С TELEGRAM
+        // ИНИЦИАЛИЗАЦИЯ
         // =============================================
-        let tg = window.Telegram?.WebApp;
-        if (tg) {
+        let tg = null;
+        if (window.Telegram && window.Telegram.WebApp) {
+            tg = window.Telegram.WebApp;
             tg.ready();
             tg.expand();
         }
@@ -129,6 +130,31 @@
                 this.soundToggle.addEventListener('click', () => {
                     this.toggleMute();
                 });
+
+                this.initializeSounds();
+            }
+
+            initializeSounds() {
+                // Добавляем звуки из папки sounds
+                this.addSound('flap', {
+                    audio: 'sounds/flap.wav',
+                    volume: 0.3
+                });
+
+                this.addSound('score', {
+                    audio: 'sounds/score.wav',
+                    volume: 0.5
+                });
+
+                this.addSound('hit', {
+                    audio: 'sounds/hit.wav',
+                    volume: 0.7
+                });
+
+                this.addSound('background', {
+                    audio: 'sounds/background.mp3',
+                    volume: 0.2
+                });
             }
 
             addSound(key, config) {
@@ -180,26 +206,67 @@
 
         const soundManager = new SoundManager();
 
-        // Добавляем звуки из папки sounds
-        soundManager.addSound('flap', {
-            audio: 'sounds/flap.wav',
-            volume: 0.3
-        });
+        // =============================================
+        // МЕНЕДЖЕР СТАТИСТИКИ
+        // =============================================
+        class StatsManager {
+            constructor() {
+                this.bestScoreKey = 'flappyBestScore';
+                this.gamesPlayedKey = 'flappyGamesPlayed';
+                this.totalScoreKey = 'flappyTotalScore';
+            }
 
-        soundManager.addSound('score', {
-            audio: 'sounds/score.wav',
-            volume: 0.5
-        });
+            getBestScore() {
+                return parseInt(localStorage.getItem(this.bestScoreKey)) || 0;
+            }
 
-        soundManager.addSound('hit', {
-            audio: 'sounds/hit.wav',
-            volume: 0.7
-        });
+            setBestScore(score) {
+                const currentBest = this.getBestScore();
+                if (score > currentBest) {
+                    localStorage.setItem(this.bestScoreKey, score);
+                    return true;
+                }
+                return false;
+            }
 
-        soundManager.addSound('background', {
-            audio: 'sounds/background.mp3',
-            volume: 0.2
-        });
+            incrementGamesPlayed() {
+                const games = parseInt(localStorage.getItem(this.gamesPlayedKey)) || 0;
+                localStorage.setItem(this.gamesPlayedKey, games + 1);
+            }
+
+            getGamesPlayed() {
+                return parseInt(localStorage.getItem(this.gamesPlayedKey)) || 0;
+            }
+
+            addToTotalScore(score) {
+                const total = parseInt(localStorage.getItem(this.totalScoreKey)) || 0;
+                localStorage.setItem(this.totalScoreKey, total + score);
+            }
+
+            getTotalScore() {
+                return parseInt(localStorage.getItem(this.totalScoreKey)) || 0;
+            }
+
+            getAverageScore() {
+                const total = this.getTotalScore();
+                const games = this.getGamesPlayed();
+                return games > 0 ? Math.round(total / games) : 0;
+            }
+
+            getAchievements(bestScore) {
+                const achievements = [];
+                
+                if (bestScore >= 5) achievements.push('Новичок (5 очков)');
+                if (bestScore >= 10) achievements.push('Любитель (10 очков)');
+                if (bestScore >= 20) achievements.push('Эксперт (20 очков)');
+                if (bestScore >= 50) achievements.push('Мастер (50 очков)');
+                if (bestScore >= 100) achievements.push('Легенда (100 очков)');
+                
+                return achievements.length > 0 ? achievements : ['Пока нет достижений'];
+            }
+        }
+
+        const statsManager = new StatsManager();
 
         // =============================================
         // КОНФИГУРАЦИЯ ИГРЫ
@@ -262,7 +329,7 @@
                 this.cameras.main.setBackgroundColor(0x1a1a2e);
 
                 // Заголовок
-                const title = this.add.text(config.width/2, 150, 'FLAPPY BIRD', {
+                this.add.text(config.width/2, 150, 'FLAPPY BIRD', {
                     fontSize: '32px',
                     fill: '#FFD700',
                     fontStyle: 'bold'
@@ -274,7 +341,7 @@
                 }).setOrigin(0.5);
 
                 // Лучший счет
-                const bestScore = localStorage.getItem('flappyBestScore') || 0;
+                const bestScore = statsManager.getBestScore();
                 const bestScoreText = this.add.text(config.width/2, 230, `Рекорд: ${bestScore}`, {
                     fontSize: '16px',
                     fill: '#CCCCCC'
@@ -283,7 +350,7 @@
                 // Выбор сложности
                 const difficulties = ['easy', 'medium', 'hard'];
                 const difficultyLabels = ['Лёгкий', 'Средний', 'Сложный'];
-                let selectedDifficulty = 'medium'; // По умолчанию
+                let selectedDifficulty = 'medium';
 
                 for (let i = 0; i < difficulties.length; i++) {
                     const diffButton = this.add.text(config.width/2, 280 + i * 50, difficultyLabels[i], {
@@ -331,13 +398,38 @@
                 });
 
                 startButton.on('pointerdown', () => {
-                    this.scene.start('MainGame', { difficulty: selectedDifficulty });
+                    this.startGame(selectedDifficulty);
                 });
 
-                // Автопереход через 10 секунд (увеличено для выбора сложности)
-                this.time.delayedCall(10000, () => {
-                    this.scene.start('MainGame', { difficulty: selectedDifficulty });
+                // Кнопка таблицы лидеров
+                const leaderboardButton = this.add.text(config.width/2, 520, 'ТАБЛИЦА ЛИДЕРОВ', {
+                    fontSize: '16px',
+                    fill: '#FFFFFF',
+                    backgroundColor: '#1E90FF',
+                    padding: { x: 15, y: 8 }
+                }).setOrigin(0.5).setInteractive();
+
+                leaderboardButton.on('pointerover', () => {
+                    leaderboardButton.setBackgroundColor('#1565C0');
                 });
+
+                leaderboardButton.on('pointerout', () => {
+                    leaderboardButton.setBackgroundColor('#1E90FF');
+                });
+
+                leaderboardButton.on('pointerdown', () => {
+                    this.scene.start('LeaderboardScene');
+                });
+
+                // Автопереход через 10 секунд
+                this.time.delayedCall(10000, () => {
+                    this.startGame(selectedDifficulty);
+                });
+            }
+
+            startGame(difficulty) {
+                statsManager.incrementGamesPlayed();
+                this.scene.start('MainGame', { difficulty: difficulty });
             }
         }
 
@@ -350,7 +442,6 @@
             }
 
             init(data) {
-                // Сбрасываем состояние игры при каждом запуске
                 this.score = 0;
                 this.gameOver = false;
                 this.pipeTimer = null;
@@ -383,14 +474,15 @@
                 });
 
                 // Лучший счет
-                this.bestScore = localStorage.getItem('flappyBestScore') || 0;
+                this.bestScore = statsManager.getBestScore();
                 this.bestScoreText = this.add.text(20, 50, 'Рекорд: ' + this.bestScore, { 
                     fontSize: '14px', 
                     fill: '#FFD700'
                 });
                 
                 // Уровень сложности
-                this.difficultyText = this.add.text(20, 80, 'Сложность: ' + (this.difficulty === 'easy' ? 'Лёгкий' : this.difficulty === 'hard' ? 'Сложный' : 'Средний'), { 
+                const difficultyText = this.difficulty === 'easy' ? 'Лёгкий' : this.difficulty === 'hard' ? 'Сложный' : 'Средний';
+                this.difficultyText = this.add.text(20, 80, 'Сложность: ' + difficultyText, { 
                     fontSize: '14px', 
                     fill: '#FFFFFF'
                 });
@@ -469,7 +561,7 @@
             }
 
             endGame() {
-                if (this.gameOver) return; // Защита от повторного вызова
+                if (this.gameOver) return;
                 
                 this.gameOver = true;
                 this.bird.setTint(0xFF0000);
@@ -487,17 +579,18 @@
                 // Проигрываем звук удара
                 soundManager.playSound('hit');
                 
-                // Сохраняем рекорд
+                // Сохраняем статистику
                 const finalScore = Math.floor(this.score);
-                if (finalScore > this.bestScore) {
-                    localStorage.setItem('flappyBestScore', finalScore);
-                }
+                const isNewRecord = statsManager.setBestScore(finalScore);
+                statsManager.addToTotalScore(finalScore);
                 
                 // Задержка перед переходом на сцену окончания
                 this.time.delayedCall(1000, () => {
                     this.scene.start('GameOverScene', { 
                         score: finalScore,
-                        bestScore: Math.max(finalScore, this.bestScore)
+                        bestScore: Math.max(finalScore, this.bestScore),
+                        isNewRecord: isNewRecord,
+                        difficulty: this.difficulty
                     });
                 });
             }
@@ -508,7 +601,6 @@
                     this.pipeTimer.remove();
                 }
                 this.pipes.clear(true, true);
-                // Останавливаем фоновую музыку при выходе из игры
                 soundManager.stopBackgroundMusic();
             }
         }
@@ -524,6 +616,8 @@
             init(data) {
                 this.score = data.score;
                 this.bestScore = data.bestScore;
+                this.isNewRecord = data.isNewRecord;
+                this.difficulty = data.difficulty;
             }
 
             create() {
@@ -534,48 +628,51 @@
                 // Панель результатов
                 const panel = this.add.graphics();
                 panel.fillStyle(0x1a1a2e, 1);
-                panel.fillRoundedRect(config.width/2 - 120, config.height/2 - 100, 240, 200, 10);
+                panel.fillRoundedRect(config.width/2 - 120, config.height/2 - 120, 240, 240, 10);
 
                 // Текст
-                this.add.text(config.width/2, config.height/2 - 70, 'ИГРА ОКОНЧЕНА', {
+                this.add.text(config.width/2, config.height/2 - 90, 'ИГРА ОКОНЧЕНА', {
                     fontSize: '20px',
                     fill: '#FF6B6B',
                     fontStyle: 'bold'
                 }).setOrigin(0.5);
 
-                this.add.text(config.width/2, config.height/2 - 30, 'Счёт: ' + this.score, {
+                if (this.isNewRecord) {
+                    this.add.text(config.width/2, config.height/2 - 50, 'НОВЫЙ РЕКОРД!', {
+                        fontSize: '18px',
+                        fill: '#FFD700',
+                        fontStyle: 'bold'
+                    }).setOrigin(0.5);
+                }
+
+                this.add.text(config.width/2, config.height/2 - 20, 'Счёт: ' + this.score, {
                     fontSize: '24px',
                     fill: '#FFD700'
                 }).setOrigin(0.5);
 
-                this.add.text(config.width/2, config.height/2, 'Рекорд: ' + this.bestScore, {
+                this.add.text(config.width/2, config.height/2 + 10, 'Рекорд: ' + this.bestScore, {
                     fontSize: '18px',
                     fill: '#1E90FF'
                 }).setOrigin(0.5);
 
                 // Кнопка рестарта
-                const restartButton = this.add.text(config.width/2, config.height/2 + 40, 'ИГРАТЬ СНОВА', {
+                const restartButton = this.add.text(config.width/2, config.height/2 + 50, 'ИГРАТЬ СНОВА', {
                     fontSize: '16px',
                     fill: '#FFFFFF',
                     backgroundColor: '#1E90FF',
                     padding: { x: 15, y: 8 }
                 }).setOrigin(0.5).setInteractive();
-const leaderboardButton = this.add.text(config.width/2, 510, 'ТАБЛИЦА ЛИДЕРОВ', {
-    fontSize: '16px',
-    fill: '#FFFFFF',
-    backgroundColor: '#1E90FF',
-    padding: { x: 15, y: 6 }
-}).setOrigin(0.5).setInteractive();
 
-leaderboardButton.on('pointerover', () => leaderboardButton.setBackgroundColor('#1565C0'));
-leaderboardButton.on('pointerout', () => leaderboardButton.setBackgroundColor('#1E90FF'));
-leaderboardButton.on('pointerdown', () => {
-    if (tg) {
-        tg.openLink('https://t.me/flappybird1728_bot?start=leaderboard');
-    }
-});
+                // Кнопка таблицы лидеров
+                const leaderboardButton = this.add.text(config.width/2, config.height/2 + 90, 'ТАБЛИЦА ЛИДЕРОВ', {
+                    fontSize: '16px',
+                    fill: '#FFFFFF',
+                    backgroundColor: '#1E90FF',
+                    padding: { x: 15, y: 8 }
+                }).setOrigin(0.5).setInteractive();
+
                 // Кнопка в меню
-                const menuButton = this.add.text(config.width/2, config.height/2 + 70, 'В МЕНЮ', {
+                const menuButton = this.add.text(config.width/2, config.height/2 + 130, 'В МЕНЮ', {
                     fontSize: '14px',
                     fill: '#CCCCCC',
                     backgroundColor: '#333333',
@@ -587,7 +684,13 @@ leaderboardButton.on('pointerdown', () => {
                 restartButton.on('pointerout', () => restartButton.setBackgroundColor('#1E90FF'));
                 restartButton.on('pointerdown', () => {
                     adManager.showInterstitial();
-                    this.scene.start('MainGame');
+                    this.scene.start('MainGame', { difficulty: this.difficulty });
+                });
+
+                leaderboardButton.on('pointerover', () => leaderboardButton.setBackgroundColor('#1565C0'));
+                leaderboardButton.on('pointerout', () => leaderboardButton.setBackgroundColor('#1E90FF'));
+                leaderboardButton.on('pointerdown', () => {
+                    this.scene.start('LeaderboardScene');
                 });
 
                 menuButton.on('pointerover', () => menuButton.setBackgroundColor('#555555'));
@@ -602,9 +705,91 @@ leaderboardButton.on('pointerdown', () => {
                         action: 'game_over',
                         score: this.score,
                         user_id: tg.initDataUnsafe.user?.id || 'unknown',
-                        difficulty: this.scene.get('MainGame').difficulty
+                        difficulty: this.difficulty
                     }));
                 }
+            }
+        }
+
+        // =============================================
+        // СЦЕНА ТАБЛИЦЫ ЛИДЕРОВ
+        // =============================================
+        class LeaderboardScene extends Phaser.Scene {
+            constructor() {
+                super({ key: 'LeaderboardScene' });
+            }
+
+            create() {
+                // Фон
+                this.cameras.main.setBackgroundColor(0x1a1a2e);
+
+                // Заголовок
+                this.add.text(config.width/2, 80, 'ТАБЛИЦА ЛИДЕРОВ', {
+                    fontSize: '28px',
+                    fill: '#FFD700',
+                    fontStyle: 'bold'
+                }).setOrigin(0.5);
+
+                // Получаем статистику
+                const bestScore = statsManager.getBestScore();
+                const gamesPlayed = statsManager.getGamesPlayed();
+                const totalScore = statsManager.getTotalScore();
+                const averageScore = statsManager.getAverageScore();
+                
+                // Статистика
+                this.add.text(config.width/2, 140, `Ваш рекорд: ${bestScore}`, {
+                    fontSize: '20px',
+                    fill: '#1E90FF'
+                }).setOrigin(0.5);
+
+                this.add.text(config.width/2, 170, `Всего игр: ${gamesPlayed}`, {
+                    fontSize: '16px',
+                    fill: '#FFFFFF'
+                }).setOrigin(0.5);
+
+                this.add.text(config.width/2, 200, `Средний счёт: ${averageScore}`, {
+                    fontSize: '16px',
+                    fill: '#FFFFFF'
+                }).setOrigin(0.5);
+
+                this.add.text(config.width/2, 230, `Всего очков: ${totalScore}`, {
+                    fontSize: '16px',
+                    fill: '#FFFFFF'
+                }).setOrigin(0.5);
+
+                // Достижения
+                const achievements = statsManager.getAchievements(bestScore);
+                this.add.text(config.width/2, 270, 'ДОСТИЖЕНИЯ:', {
+                    fontSize: '16px',
+                    fill: '#FFD700'
+                }).setOrigin(0.5);
+
+                achievements.forEach((achievement, index) => {
+                    this.add.text(config.width/2, 300 + index * 25, `✓ ${achievement}`, {
+                        fontSize: '14px',
+                        fill: '#90EE90'
+                    }).setOrigin(0.5);
+                });
+
+                // Кнопка назад
+                const backButton = this.add.text(config.width/2, 450, 'НАЗАД', {
+                    fontSize: '18px',
+                    fill: '#FFFFFF',
+                    backgroundColor: '#1E90FF',
+                    padding: { x: 20, y: 10 }
+                }).setOrigin(0.5).setInteractive();
+
+                backButton.on('pointerover', () => {
+                    backButton.setBackgroundColor('#1565C0');
+                });
+
+                backButton.on('pointerout', () => {
+                    backButton.setBackgroundColor('#1E90FF');
+                });
+
+                backButton.on('pointerdown', () => {
+                    this.scene.start('SplashScene');
+                });
             }
         }
 
@@ -614,6 +799,7 @@ leaderboardButton.on('pointerdown', () => {
         game.scene.add('SplashScene', SplashScene);
         game.scene.add('MainGame', MainGame);
         game.scene.add('GameOverScene', GameOverScene);
+        game.scene.add('LeaderboardScene', LeaderboardScene);
         game.scene.start('SplashScene');
     </script>
 </body>
