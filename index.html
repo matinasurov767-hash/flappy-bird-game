@@ -601,6 +601,8 @@ leaderboardButton.on('pointerdown', () => {
                     tg.sendData(JSON.stringify({ 
                         action: 'game_over',
                         score: this.score
+                        user_id: tg.initDataUnsafe.user?.id || 'unknown',
+                        difficulty: this.scene.get('MainGame').difficulty
                     }));
                 }
             }
