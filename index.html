@@ -101,18 +101,6 @@
                     this.adContainer.style.display = 'none';
                 }, 5000);
             }
-
-            showRewardedAd() {
-                return new Promise((resolve) => {
-                    this.adContainer.style.display = 'block';
-                    this.adContainer.innerHTML = 'Реклама · Получите +10 очков<br><small>Закройте через 3 сек</small>';
-                    
-                    setTimeout(() => {
-                        this.adContainer.style.display = 'none';
-                        resolve(true);
-                    }, 3000);
-                });
-            }
         }
 
         const adManager = new AdManager();
@@ -135,26 +123,10 @@
             }
 
             initializeSounds() {
-                // Добавляем звуки из папки sounds
-                this.addSound('flap', {
-                    audio: 'sounds/flap.wav',
-                    volume: 0.3
-                });
-
-                this.addSound('score', {
-                    audio: 'sounds/score.wav',
-                    volume: 0.5
-                });
-
-                this.addSound('hit', {
-                    audio: 'sounds/hit.wav',
-                    volume: 0.7
-                });
-
-                this.addSound('background', {
-                    audio: 'sounds/background.mp3',
-                    volume: 0.2
-                });
+                this.addSound('flap', { audio: 'sounds/flap.wav', volume: 0.3 });
+                this.addSound('score', { audio: 'sounds/score.wav', volume: 0.5 });
+                this.addSound('hit', { audio: 'sounds/hit.wav', volume: 0.7 });
+                this.addSound('background', { audio: 'sounds/background.mp3', volume: 0.2 });
             }
 
             addSound(key, config) {
@@ -211,7 +183,8 @@
         // =============================================
         class OnlineLeaderboardManager {
             constructor() {
-                this.apiUrl = 'https://your-backend-url.com/api'; // Замените на ваш URL
+                // ЗАМЕНИТЕ НА ВАШ РЕАЛЬНЫЙ URL СЕРВЕРА
+                this.apiUrl = 'https://your-server.vercel.app/api';
                 this.leaderboard = [];
                 this.userRank = 0;
             }
@@ -245,14 +218,13 @@
                     return await response.json();
                 } catch (error) {
                     console.error('Error submitting score:', error);
-                    // Fallback to localStorage
-                    this.submitScoreToLocalStorage(score, userData);
                 }
             }
 
             async getLeaderboard() {
                 try {
-                    const response = await fetch(`${this.apiUrl}/leaderboard`);
+                    const userId = tg?.initDataUnsafe?.user?.id || '';
+                    const response = await fetch(`${this.apiUrl}/leaderboard?user_id=${userId}`);
                     if (!response.ok) {
                         throw new Error('Failed to fetch leaderboard');
                     }
@@ -264,40 +236,18 @@
                     return this.leaderboard;
                 } catch (error) {
                     console.error('Error fetching leaderboard:', error);
-                    // Fallback to localStorage
                     return this.getLocalLeaderboard();
                 }
             }
 
-            // Fallback методы для локального хранения
-            submitScoreToLocalStorage(score, userData) {
-                const leaderboard = JSON.parse(localStorage.getItem('onlineLeaderboard') || '[]');
-                const user = tg?.initDataUnsafe?.user;
-                
-                const entry = {
-                    score: score,
-                    user_id: user?.id || 'anonymous',
-                    first_name: user?.first_name || 'Игрок',
-                    last_name: user?.last_name || '',
-                    username: user?.username || '',
-                    difficulty: userData.difficulty,
-                    timestamp: Date.now()
-                };
-
-                leaderboard.push(entry);
-                
-                // Сортируем по убыванию счета и оставляем топ-50
-                leaderboard.sort((a, b) => b.score - a.score);
-                const topScores = leaderboard.slice(0, 50);
-                
-                localStorage.setItem('onlineLeaderboard', JSON.stringify(topScores));
-            }
-
             getLocalLeaderboard() {
-                const leaderboard = JSON.parse(localStorage.getItem('onlineLeaderboard') || '[]');
-                // Сортируем на случай, если данные были добавлены вручную
-                leaderboard.sort((a, b) => b.score - a.score);
-                return leaderboard.slice(0, 10); // Возвращаем топ-10
+                // Fallback данные если сервер недоступен
+                return [
+                    { score: 50, user_id: 'bot1', first_name: 'Алекс', difficulty: 'medium' },
+                    { score: 30, user_id: 'bot2', first_name: 'Мария', difficulty: 'easy' },
+                    { score: 20, user_id: 'bot3', first_name: 'Иван', difficulty: 'hard' },
+                    { score: 10, user_id: 'bot4', first_name: 'Елена', difficulty: 'medium' }
+                ];
             }
 
             getUserRank() {
@@ -334,43 +284,12 @@
                 const games = parseInt(localStorage.getItem(this.gamesPlayedKey)) || 0;
                 localStorage.setItem(this.gamesPlayedKey, games + 1);
             }
-
-            getGamesPlayed() {
-                return parseInt(localStorage.getItem(this.gamesPlayedKey)) || 0;
-            }
-
-            addToTotalScore(score) {
-                const total = parseInt(localStorage.getItem(this.totalScoreKey)) || 0;
-                localStorage.setItem(this.totalScoreKey, total + score);
-            }
-
-            getTotalScore() {
-                return parseInt(localStorage.getItem(this.totalScoreKey)) || 0;
-            }
-
-            getAverageScore() {
-                const total = this.getTotalScore();
-                const games = this.getGamesPlayed();
-                return games > 0 ? Math.round(total / games) : 0;
-            }
-
-            getAchievements(bestScore) {
-                const achievements = [];
-                
-                if (bestScore >= 5) achievements.push('Новичок (5 очков)');
-                if (bestScore >= 10) achievements.push('Любитель (10 очков)');
-                if (bestScore >= 20) achievements.push('Эксперт (20 очков)');
-                if (bestScore >= 50) achievements.push('Мастер (50 очков)');
-                if (bestScore >= 100) achievements.push('Легенда (100 очков)');
-                
-                return achievements.length > 0 ? achievements : ['Пока нет достижений'];
-            }
         }
 
         const statsManager = new StatsManager();
 
         // =============================================
-        // КОНФИГУРАЦИЯ ИГРЫ
+        // КОНФИГУРАЦИЯ ИГРЫ PHAZER
         // =============================================
         const config = {
             type: Phaser.AUTO,
@@ -401,12 +320,10 @@
             }
 
             preload() {
-                // Загружаем ассеты
                 this.load.image('bird', 'assets/bird.png');
                 this.load.image('pipe', 'assets/pipe.png');
                 this.load.image('background', 'assets/background.png');
 
-                // Индикатор загрузки
                 const progressBox = this.add.graphics();
                 progressBox.fillStyle(0x222222, 0.8);
                 progressBox.fillRect(110, 270, 140, 30);
@@ -426,24 +343,21 @@
             }
 
             create() {
-                // Фон
                 this.cameras.main.setBackgroundColor(0x1a1a2e);
 
-                // Заголовок
                 this.add.text(config.width/2, 150, 'FLAPPY BIRD', {
                     fontSize: '32px',
                     fill: '#FFD700',
                     fontStyle: 'bold'
                 }).setOrigin(0.5);
 
-                const developer = this.add.text(config.width/2, 190, 'by MATIN', {
+                this.add.text(config.width/2, 190, 'by MATIN', {
                     fontSize: '18px',
                     fill: '#FFFFFF'
                 }).setOrigin(0.5);
 
-                // Лучший счет
                 const bestScore = statsManager.getBestScore();
-                const bestScoreText = this.add.text(config.width/2, 230, `Рекорд: ${bestScore}`, {
+                this.add.text(config.width/2, 230, `Рекорд: ${bestScore}`, {
                     fontSize: '16px',
                     fill: '#CCCCCC'
                 }).setOrigin(0.5);
@@ -461,16 +375,9 @@
                         padding: { x: 20, y: 10 }
                     }).setOrigin(0.5).setInteractive();
 
-                    diffButton.on('pointerover', () => {
-                        diffButton.setBackgroundColor('#1565C0');
-                    });
-
-                    diffButton.on('pointerout', () => {
-                        diffButton.setBackgroundColor(difficulties[i] === selectedDifficulty ? '#1565C0' : '#1E90FF');
-                    });
-
+                    diffButton.on('pointerover', () => diffButton.setBackgroundColor('#1565C0'));
+                    diffButton.on('pointerout', () => diffButton.setBackgroundColor(difficulties[i] === selectedDifficulty ? '#1565C0' : '#1E90FF'));
                     diffButton.on('pointerdown', () => {
-                        // Сброс стилей предыдущей выбранной
                         this.children.list.forEach(child => {
                             if (child.text && difficultyLabels.includes(child.text)) {
                                 const index = difficultyLabels.indexOf(child.text);
@@ -490,14 +397,8 @@
                     padding: { x: 20, y: 10 }
                 }).setOrigin(0.5).setInteractive();
 
-                startButton.on('pointerover', () => {
-                    startButton.setBackgroundColor('#1565C0');
-                });
-
-                startButton.on('pointerout', () => {
-                    startButton.setBackgroundColor('#1E90FF');
-                });
-
+                startButton.on('pointerover', () => startButton.setBackgroundColor('#1565C0'));
+                startButton.on('pointerout', () => startButton.setBackgroundColor('#1E90FF'));
                 startButton.on('pointerdown', () => {
                     this.startGame(selectedDifficulty);
                 });
@@ -510,19 +411,12 @@
                     padding: { x: 15, y: 8 }
                 }).setOrigin(0.5).setInteractive();
 
-                leaderboardButton.on('pointerover', () => {
-                    leaderboardButton.setBackgroundColor('#1565C0');
-                });
-
-                leaderboardButton.on('pointerout', () => {
-                    leaderboardButton.setBackgroundColor('#1E90FF');
-                });
-
+                leaderboardButton.on('pointerover', () => leaderboardButton.setBackgroundColor('#1565C0'));
+                leaderboardButton.on('pointerout', () => leaderboardButton.setBackgroundColor('#1E90FF'));
                 leaderboardButton.on('pointerdown', () => {
                     this.scene.start('OnlineLeaderboardScene');
                 });
 
-                // Автопереход через 10 секунд
                 this.time.delayedCall(10000, () => {
                     this.startGame(selectedDifficulty);
                 });
@@ -552,21 +446,15 @@
             }
 
             create() {
-                // Фон
                 this.add.image(config.width/2, config.height/2, 'background')
                     .setDisplaySize(config.width, config.height);
 
-                // Птица
                 this.bird = this.physics.add.sprite(80, config.height/2, 'bird');
                 this.bird.setCollideWorldBounds(true);
                 
-                // Трубы
                 this.pipes = this.physics.add.group();
-                
-                // Коллайдер
                 this.physics.add.collider(this.bird, this.pipes, this.hitPipe, null, this);
                 
-                // Счет
                 this.scoreText = this.add.text(20, 20, 'Счёт: 0', { 
                     fontSize: '20px', 
                     fill: '#FFF',
@@ -574,24 +462,20 @@
                     strokeThickness: 4
                 });
 
-                // Лучший счет
                 this.bestScore = statsManager.getBestScore();
                 this.bestScoreText = this.add.text(20, 50, 'Рекорд: ' + this.bestScore, { 
                     fontSize: '14px', 
                     fill: '#FFD700'
                 });
                 
-                // Уровень сложности
                 const difficultyText = this.difficulty === 'easy' ? 'Лёгкий' : this.difficulty === 'hard' ? 'Сложный' : 'Средний';
                 this.difficultyText = this.add.text(20, 80, 'Сложность: ' + difficultyText, { 
                     fontSize: '14px', 
                     fill: '#FFFFFF'
                 });
                 
-                // Управление
                 this.input.on('pointerdown', this.flap, this);
                 
-                // Генерация труб
                 this.pipeTimer = this.time.addEvent({ 
                     delay: 1500, 
                     callback: this.addPipe, 
@@ -599,26 +483,22 @@
                     loop: true 
                 });
 
-                // Запускаем фоновую музыку
                 soundManager.playBackgroundMusic();
             }
 
             update() {
                 if (this.gameOver) return;
                 
-                // Поворот птицы
                 if (this.bird.body.velocity.y < 0) {
                     this.bird.rotation = -0.3;
                 } else {
                     this.bird.rotation = Phaser.Math.Clamp(this.bird.body.velocity.y / 400, -0.3, 0.5);
                 }
                 
-                // Конец игры
                 if (this.bird.y > config.height - 10 || this.bird.y < -10) {
                     this.endGame();
                 }
                 
-                // Обновление счета
                 this.pipes.children.iterate(pipe => {
                     if (!pipe.passed && pipe.x < this.bird.x - 10) {
                         pipe.passed = true;
@@ -640,14 +520,12 @@
                 
                 const holePosition = Phaser.Math.Between(120, config.height - 120);
                 
-                // Верхняя труба
                 const topPipe = this.pipes.create(config.width, holePosition - this.gap/2, 'pipe');
                 topPipe.setOrigin(0.5, 1);
                 topPipe.setImmovable(true);
                 topPipe.body.allowGravity = false;
                 topPipe.setVelocityX(this.pipeSpeed);
                 
-                // Нижняя труба  
                 const bottomPipe = this.pipes.create(config.width, holePosition + this.gap/2, 'pipe');
                 bottomPipe.setOrigin(0.5, 0);
                 bottomPipe.setImmovable(true);
@@ -667,30 +545,24 @@
                 this.gameOver = true;
                 this.bird.setTint(0xFF0000);
                 
-                // Останавливаем генерацию труб
                 if (this.pipeTimer) {
                     this.pipeTimer.remove();
                 }
                 
-                // Останавливаем движение труб
                 this.pipes.children.iterate(pipe => {
                     pipe.setVelocityX(0);
                 });
                 
-                // Проигрываем звук удара
                 soundManager.playSound('hit');
                 
-                // Сохраняем статистику
                 const finalScore = Math.floor(this.score);
                 const isNewRecord = statsManager.setBestScore(finalScore);
-                statsManager.addToTotalScore(finalScore);
                 
-                // Отправляем результат в онлайн таблицу лидеров
+                // ОТПРАВЛЯЕМ РЕЗУЛЬТАТ НА СЕРВЕР
                 onlineLeaderboard.submitScore(finalScore, {
                     difficulty: this.difficulty
                 });
                 
-                // Задержка перед переходом на сцену окончания
                 this.time.delayedCall(1000, () => {
                     this.scene.start('GameOverScene', { 
                         score: finalScore,
@@ -702,7 +574,6 @@
             }
 
             shutdown() {
-                // Очищаем ресурсы при закрытии сцены
                 if (this.pipeTimer) {
                     this.pipeTimer.remove();
                 }
@@ -727,16 +598,13 @@
             }
 
             create() {
-                // Полупрозрачный фон
                 const overlay = this.add.rectangle(0, 0, config.width, config.height, 0x000000, 0.7);
                 overlay.setOrigin(0);
 
-                // Панель результатов
                 const panel = this.add.graphics();
                 panel.fillStyle(0x1a1a2e, 1);
                 panel.fillRoundedRect(config.width/2 - 120, config.height/2 - 120, 240, 240, 10);
 
-                // Текст
                 this.add.text(config.width/2, config.height/2 - 90, 'ИГРА ОКОНЧЕНА', {
                     fontSize: '20px',
                     fill: '#FF6B6B',
@@ -761,7 +629,6 @@
                     fill: '#1E90FF'
                 }).setOrigin(0.5);
 
-                // Кнопка рестарта
                 const restartButton = this.add.text(config.width/2, config.height/2 + 50, 'ИГРАТЬ СНОВА', {
                     fontSize: '16px',
                     fill: '#FFFFFF',
@@ -769,7 +636,6 @@
                     padding: { x: 15, y: 8 }
                 }).setOrigin(0.5).setInteractive();
 
-                // Кнопка онлайн таблицы лидеров
                 const leaderboardButton = this.add.text(config.width/2, config.height/2 + 90, 'ОНЛАЙН ТАБЛИЦА', {
                     fontSize: '16px',
                     fill: '#FFFFFF',
@@ -777,7 +643,6 @@
                     padding: { x: 15, y: 8 }
                 }).setOrigin(0.5).setInteractive();
 
-                // Кнопка в меню
                 const menuButton = this.add.text(config.width/2, config.height/2 + 130, 'В МЕНЮ', {
                     fontSize: '14px',
                     fill: '#CCCCCC',
@@ -785,7 +650,6 @@
                     padding: { x: 15, y: 6 }
                 }).setOrigin(0.5).setInteractive();
 
-                // Обработчики кнопок
                 restartButton.on('pointerover', () => restartButton.setBackgroundColor('#1565C0'));
                 restartButton.on('pointerout', () => restartButton.setBackgroundColor('#1E90FF'));
                 restartButton.on('pointerdown', () => {
@@ -804,16 +668,6 @@
                 menuButton.on('pointerdown', () => {
                     this.scene.start('SplashScene');
                 });
-
-                // Отправка в Telegram
-                if (tg) {
-                    tg.sendData(JSON.stringify({ 
-                        action: 'game_over',
-                        score: this.score,
-                        user_id: tg.initDataUnsafe.user?.id || 'unknown',
-                        difficulty: this.difficulty
-                    }));
-                }
             }
         }
 
@@ -826,23 +680,19 @@
             }
 
             create() {
-                // Фон
                 this.cameras.main.setBackgroundColor(0x1a1a2e);
 
-                // Заголовок
                 this.add.text(config.width/2, 60, 'ОНЛАЙН ТАБЛИЦА ЛИДЕРОВ', {
                     fontSize: '22px',
                     fill: '#FFD700',
                     fontStyle: 'bold'
                 }).setOrigin(0.5);
 
-                // Индикатор загрузки
                 const loadingText = this.add.text(config.width/2, config.height/2, 'Загрузка...', {
                     fontSize: '18px',
                     fill: '#FFFFFF'
                 }).setOrigin(0.5);
 
-                // Загружаем таблицу лидеров
                 onlineLeaderboard.getLeaderboard().then(leaderboard => {
                     loadingText.destroy();
                     this.displayLeaderboard(leaderboard);
@@ -851,7 +701,6 @@
                     console.error('Error loading leaderboard:', error);
                 });
 
-                // Кнопка обновления
                 const refreshButton = this.add.text(config.width - 30, 30, '🔄', {
                     fontSize: '20px'
                 }).setOrigin(0.5).setInteractive();
@@ -860,7 +709,6 @@
                     this.scene.restart();
                 });
 
-                // Кнопка назад
                 const backButton = this.add.text(config.width/2, 580, 'НАЗАД', {
                     fontSize: '18px',
                     fill: '#FFFFFF',
@@ -868,14 +716,8 @@
                     padding: { x: 20, y: 10 }
                 }).setOrigin(0.5).setInteractive();
 
-                backButton.on('pointerover', () => {
-                    backButton.setBackgroundColor('#1565C0');
-                });
-
-                backButton.on('pointerout', () => {
-                    backButton.setBackgroundColor('#1E90FF');
-                });
-
+                backButton.on('pointerover', () => backButton.setBackgroundColor('#1565C0'));
+                backButton.on('pointerout', () => backButton.setBackgroundColor('#1E90FF'));
                 backButton.on('pointerdown', () => {
                     this.scene.start('SplashScene');
                 });
@@ -890,7 +732,6 @@
                     return;
                 }
 
-                // Заголовки столбцов
                 this.add.text(30, 100, 'Место', {
                     fontSize: '14px',
                     fill: '#FFD700',
@@ -909,11 +750,9 @@
                     fontStyle: 'bold'
                 });
 
-                // Список лидеров
                 leaderboard.forEach((entry, index) => {
                     const y = 130 + index * 30;
                     
-                    // Место
                     let medal = '';
                     let medalColor = '#FFFFFF';
                     
@@ -933,16 +772,11 @@
                         fill: medalColor
                     });
 
-                    // Имя игрока
                     let playerName = entry.first_name || 'Игрок';
-                    if (entry.last_name) {
-                        playerName += ' ' + entry.last_name;
-                    }
                     if (playerName.length > 15) {
                         playerName = playerName.substring(0, 15) + '...';
                     }
 
-                    // Подсветка текущего пользователя
                     const isCurrentUser = tg && tg.initDataUnsafe.user && 
                                          entry.user_id === tg.initDataUnsafe.user.id;
                     
@@ -952,7 +786,6 @@
                         fontStyle: isCurrentUser ? 'bold' : 'normal'
                     });
 
-                    // Очки
                     this.add.text(280, y, entry.score.toString(), {
                         fontSize: '14px',
                         fill: isCurrentUser ? '#1E90FF' : '#FFFFFF',
@@ -960,8 +793,15 @@
                     });
                 });
 
-                // Общее количество игроков
-                this.add.text(config.width/2, 550, `Всего игроков: ${leaderboard.length}`, {
+                const userRank = onlineLeaderboard.getUserRank();
+                if (userRank > 0) {
+                    this.add.text(config.width/2, 550, `Ваш ранг: ${userRank}`, {
+                        fontSize: '14px',
+                        fill: '#1E90FF'
+                    }).setOrigin(0.5);
+                }
+
+                this.add.text(config.width/2, 520, `Всего игроков: ${leaderboard.length}`, {
                     fontSize: '14px',
                     fill: '#CCCCCC'
                 }).setOrigin(0.5);
