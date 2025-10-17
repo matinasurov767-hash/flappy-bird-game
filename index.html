@@ -489,7 +489,8 @@
             update() {
                 if (this.gameOver) return;
                 
-                if (this.bird.body.velocity y.< 0) {
+                // ИСПРАВЛЕННАЯ ОШИБКА: было this.bird.body.velocity y, должно быть this.bird.body.velocity.y
+                if (this.bird.body.velocity.y < 0) {
                     this.bird.rotation = -0.3;
                 } else {
                     this.bird.rotation = Phaser.Math.Clamp(this.bird.body.velocity.y / 400, -0.3, 0.5);
