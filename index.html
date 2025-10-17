@@ -184,7 +184,7 @@
         class OnlineLeaderboardManager {
             constructor() {
                 // ЗАМЕНИТЕ НА ВАШ РЕАЛЬНЫЙ URL СЕРВЕРА
-                this.apiUrl = 'https://your-server.vercel.app/api';
+                this.apiUrl = 'https://flappy-bird-server-3lu594fqo-matins-projects-55555d9d.vercel.app/api';
                 this.leaderboard = [];
                 this.userRank = 0;
             }
@@ -489,7 +489,7 @@
             update() {
                 if (this.gameOver) return;
                 
-                if (this.bird.body.velocity.y < 0) {
+                if (this.bird.body.velocity y < 0) {
                     this.bird.rotation = -0.3;
                 } else {
                     this.bird.rotation = Phaser.Math.Clamp(this.bird.body.velocity.y / 400, -0.3, 0.5);
@@ -674,82 +674,104 @@
         // =============================================
         // СЦЕНА ОНЛАЙН ТАБЛИЦЫ ЛИДЕРОВ
         // =============================================
-       // =============================================
-// МЕНЕДЖЕР ОНЛАЙН ТАБЛИЦЫ ЛИДЕРОВ
-// =============================================
-class OnlineLeaderboardManager {
-    constructor() {
-        // ИСПРАВЛЕННЫЙ URL - используйте ваш реальный сервер
-        this.apiUrl = 'https://flappy-bird-server-3lu594fqo-matins-projects-55555d9d.vercel.app/api';
-        this.leaderboard = [];
-        this.userRank = 0;
-    }
-
-    async submitScore(score, userData) {
-        try {
-            if (!tg || !tg.initDataUnsafe.user) {
-                console.log('Telegram user data not available');
-                return;
+        class OnlineLeaderboardScene extends Phaser.Scene {
+            constructor() {
+                super({ key: 'OnlineLeaderboardScene' });
             }
 
-            const response = await fetch(`${this.apiUrl}/leaderboard`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    score: score,
-                    user_id: tg.initDataUnsafe.user.id,
-                    first_name: tg.initDataUnsafe.user.first_name,
-                    last_name: tg.initDataUnsafe.user.last_name || '',
-                    username: tg.initDataUnsafe.user.username || '',
-                    difficulty: userData.difficulty
-                })
-            });
+            async create() {
+                this.cameras.main.setBackgroundColor(0x1a1a2e);
 
-            if (!response.ok) {
-                throw new Error('Failed to submit score');
+                const title = this.add.text(config.width/2, 50, 'ОНЛАЙН ТАБЛИЦА ЛИДЕРОВ', {
+                    fontSize: '24px',
+                    fill: '#FFD700',
+                    fontStyle: 'bold'
+                }).setOrigin(0.5);
+
+                const backButton = this.add.text(30, 30, '← Назад', {
+                    fontSize: '16px',
+                    fill: '#FFFFFF',
+                    backgroundColor: '#1E90FF',
+                    padding: { x: 10, y: 5 }
+                }).setOrigin(0).setInteractive();
+
+                backButton.on('pointerover', () => backButton.setBackgroundColor('#1565C0'));
+                backButton.on('pointerout', () => backButton.setBackgroundColor('#1E90FF'));
+                backButton.on('pointerdown', () => {
+                    this.scene.start('SplashScene');
+                });
+
+                // Показываем заглушку загрузки
+                const loadingText = this.add.text(config.width/2, config.height/2, 'Загрузка...', {
+                    fontSize: '18px',
+                    fill: '#FFFFFF'
+                }).setOrigin(0.5);
+
+                try {
+                    const leaderboard = await onlineLeaderboard.getLeaderboard();
+                    loadingText.destroy();
+
+                    // Отображаем таблицу лидеров
+                    this.displayLeaderboard(leaderboard);
+                } catch (error) {
+                    loadingText.setText('Ошибка загрузки');
+                    console.error(error);
+                }
             }
 
-            return await response.json();
-        } catch (error) {
-            console.error('Error submitting score:', error);
+            displayLeaderboard(leaderboard) {
+                // Ограничим количество записей, например, 10
+                const top10 = leaderboard.slice(0, 10);
+
+                // Создаем заголовки таблицы
+                const headerY = 100;
+                this.add.text(50, headerY, 'Место', { fontSize: '16px', fill: '#FFD700' });
+                this.add.text(120, headerY, 'Игрок', { fontSize: '16px', fill: '#FFD700' });
+                this.add.text(250, headerY, 'Счёт', { fontSize: '16px', fill: '#FFD700' });
+                this.add.text(320, headerY, 'Сложность', { fontSize: '16px', fill: '#FFD700' });
+
+                top10.forEach((entry, index) => {
+                    const y = headerY + 30 + index * 30;
+                    const rank = index + 1;
+                    const playerName = entry.first_name + (entry.last_name ? ' ' + entry.last_name : '');
+                    const score = entry.score;
+                    const difficulty = entry.difficulty;
+
+                    // Определяем цвет в зависимости от места
+                    let color = '#FFFFFF';
+                    if (rank === 1) color = '#FFD700';
+                    else if (rank === 2) color = '#C0C0C0';
+                    else if (rank === 3) color = '#CD7F32';
+
+                    this.add.text(50, y, rank, { fontSize: '14px', fill: color });
+                    this.add.text(120, y, playerName, { fontSize: '14px', fill: color });
+                    this.add.text(250, y, score, { fontSize: '14px', fill: color });
+                    this.add.text(320, y, this.getDifficultyText(difficulty), { fontSize: '14px', fill: color });
+                });
+
+                // Покажем место пользователя, если он не в топ-10
+                const userRank = onlineLeaderboard.getUserRank();
+                if (userRank > 10) {
+                    const userEntry = leaderboard.find(entry => entry.user_id === tg?.initDataUnsafe?.user?.id);
+                    if (userEntry) {
+                        const y = headerY + 30 + 10 * 30 + 20;
+                        this.add.text(50, y, userRank, { fontSize: '14px', fill: '#1E90FF' });
+                        this.add.text(120, y, userEntry.first_name, { fontSize: '14px', fill: '#1E90FF' });
+                        this.add.text(250, y, userEntry.score, { fontSize: '14px', fill: '#1E90FF' });
+                        this.add.text(320, y, this.getDifficultyText(userEntry.difficulty), { fontSize: '14px', fill: '#1E90FF' });
+                    }
+                }
+            }
+
+            getDifficultyText(difficulty) {
+                switch (difficulty) {
+                    case 'easy': return 'Лёгкий';
+                    case 'medium': return 'Средний';
+                    case 'hard': return 'Сложный';
+                    default: return 'Неизвестно';
+                }
+            }
         }
-    }
-
-    async getLeaderboard() {
-        try {
-            const userId = tg?.initDataUnsafe?.user?.id || '';
-            const response = await fetch(`${this.apiUrl}/leaderboard?user_id=${userId}`);
-            if (!response.ok) {
-                throw new Error('Failed to fetch leaderboard');
-            }
-            
-            const data = await response.json();
-            this.leaderboard = data.leaderboard || [];
-            this.userRank = data.userRank || 0;
-            
-            return this.leaderboard;
-        } catch (error) {
-            console.error('Error fetching leaderboard:', error);
-            return this.getLocalLeaderboard();
-        }
-    }
-
-    getLocalLeaderboard() {
-        // Fallback данные если сервер недоступен
-        return [
-            { score: 50, user_id: 'bot1', first_name: 'Алекс', difficulty: 'medium' },
-            { score: 30, user_id: 'bot2', first_name: 'Мария', difficulty: 'easy' },
-            { score: 20, user_id: 'bot3', first_name: 'Иван', difficulty: 'hard' },
-            { score: 10, user_id: 'bot4', first_name: 'Елена', difficulty: 'medium' }
-        ];
-    }
-
-    getUserRank() {
-        return this.userRank;
-    }
-}
 
         // =============================================
         // ЗАПУСК СЦЕН
